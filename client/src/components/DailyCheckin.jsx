@@ -1,11 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './DailyCheckin.css'
+import InsightModal from '../components/InsightModal'
 
 const DailyCheckIn = () => {
   const [entry, setEntry] = useState('')
   const [sleep, setSleep] = useState(0)
   const [stress, setStress] = useState(0)
-  const [exercise, setExercise] = useState(null) // null = untouched
+  const [exercise, setExercise] = useState(null)
+  const [showInsights, setShowInsights] = useState(false)
+
+  // Inject Google Fonts
+  useEffect(() => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Outfit:wght@300;400;500;600&display=swap'
+    document.head.appendChild(link)
+    return () => document.head.removeChild(link)
+  }, [])
 
   const formatDate = () => {
     const today = new Date()
@@ -17,7 +28,7 @@ const DailyCheckIn = () => {
   }
 
   const handleSubmit = () => {
-    console.log({ entry, sleep, stress, exercise, date: new Date().toISOString() })
+    setShowInsights(true)
   }
 
   const renderDots = (current, max, onChange) => (
@@ -37,13 +48,20 @@ const DailyCheckIn = () => {
   return (
     <div className="checkin-wrapper">
       <div className="checkin-container">
-        {/* Header */}
+
         <div className="checkin-header">
           <h1 className="checkin-title">How are you today?</h1>
           <p className="checkin-date">{formatDate()}</p>
         </div>
 
-        {/* Textarea */}
+        <div className="header-ornament">
+          <span className="ornament-line" />
+          <span className="ornament-dot" />
+          <span className="ornament-dot" style={{ opacity: 0.25 }} />
+          <span className="ornament-dot" />
+          <span className="ornament-line" />
+        </div>
+
         <div className="textarea-wrapper">
           <textarea
             className="checkin-textarea"
@@ -55,12 +73,11 @@ const DailyCheckIn = () => {
           <span className="char-count">{entry.length > 0 ? `${entry.length} chars` : ''}</span>
         </div>
 
-        {/* Quick inputs */}
         <div className="quick-inputs">
           <div className="input-row">
             <div className="input-label">
               <span className="input-emoji">😴</span>
-              <span>Sleep quality</span>
+              <span>Sleep</span>
             </div>
             {renderDots(sleep, 5, setSleep)}
           </div>
@@ -70,7 +87,7 @@ const DailyCheckIn = () => {
           <div className="input-row">
             <div className="input-label">
               <span className="input-emoji">😤</span>
-              <span>Stress level</span>
+              <span>Stress</span>
             </div>
             {renderDots(stress, 5, setStress)}
           </div>
@@ -101,17 +118,23 @@ const DailyCheckIn = () => {
           </div>
         </div>
 
-        {/* CTA */}
         <button
           className={`log-button ${entry.length > 0 ? 'ready' : ''}`}
           onClick={handleSubmit}
           type="button"
         >
-          Log Entry
+          {entry.length > 0 ? 'Log Entry →' : 'Log Entry'}
         </button>
 
         <p className="footer-text">Takes 30 seconds · No account needed</p>
+
       </div>
+
+      <InsightModal
+        isOpen={showInsights}
+        onClose={() => setShowInsights(false)}
+      />
+
     </div>
   )
 }
