@@ -59,6 +59,148 @@
   text-align: center;
 }
 
+/* ─── Stats Grid ─────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(28, 43, 30, 0.03);
+}
+
+.stat-emoji { font-size: 1.4rem; }
+.stat-value {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.5rem;
+  color: var(--text);
+}
+.stat-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.stat-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ─── Mood Bar ───────────────────────────────────────────────────── */
+.mood-bar-section { margin-bottom: 28px; }
+
+.section-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+
+.mood-bar-track {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.mood-bar-fill { transition: width 0.5s ease; }
+.mood-good    { background: #6B8F71; }
+.mood-neutral { background: #C4A460; }
+.mood-bad     { background: #C4705A; }
+
+.mood-bar-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ─── Symptoms ───────────────────────────────────────────────────── */
+.symptoms-section { margin-bottom: 28px; }
+
+.symptoms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.symptom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.symptom-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  color: var(--text);
+  min-width: 100px;
+  text-transform: capitalize;
+}
+
+.symptom-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.symptom-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #C4705A;
+  transition: width 0.4s ease;
+}
+
+.symptom-count {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ─── Retry Button ───────────────────────────────────────────────── */
+.retry-btn {
+  margin-top: 16px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.retry-btn:hover { background: var(--border); }
+
 /* ─── Pattern Cards ──────────────────────────────────────────────── */
 .patterns-list {
   display: flex;
@@ -96,13 +238,14 @@
 }
 
 .pattern-card.strength-high::before { background-color: var(--red); }
-.pattern-card.strength-med::before { background-color: #C4A460; } /* Yellow/Neutral from Timeline */
-.pattern-card.strength-positive::before { background-color: #6B8F71; } /* Green/Good */
+.pattern-card.strength-med::before { background-color: #C4A460; }
+.pattern-card.strength-positive::before { background-color: #6B8F71; }
 
 .pattern-info {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
 }
 
 .pattern-text {
@@ -120,6 +263,24 @@
   margin: 0;
 }
 
+/* Correlation mini bar */
+.correlation-track {
+  height: 4px;
+  border-radius: 3px;
+  background: var(--border);
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.correlation-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.fill-high     { background: #C4705A; }
+.fill-med      { background: #C4A460; }
+.fill-positive { background: #6B8F71; }
+
 /* Strength Badge */
 .pattern-badge {
   font-family: 'DM Sans', sans-serif;
@@ -129,23 +290,76 @@
   border-radius: 6px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
-.badge-high { 
-  color: var(--red); 
-  background-color: rgba(196, 112, 90, 0.1); 
+.badge-high {
+  color: var(--red);
+  background-color: rgba(196, 112, 90, 0.1);
 }
-.badge-med { 
-  color: #C4A460; 
-  background-color: rgba(196, 164, 96, 0.1); 
+.badge-med {
+  color: #C4A460;
+  background-color: rgba(196, 164, 96, 0.1);
 }
-.badge-positive { 
-  color: #6B8F71; 
-  background-color: rgba(107, 143, 113, 0.1); 
+.badge-positive {
+  color: #6B8F71;
+  background-color: rgba(107, 143, 113, 0.1);
+}
+
+/* ─── Predictions ────────────────────────────────────────────────── */
+.predictions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.prediction-card {
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1.5px solid var(--border);
+  box-shadow: 0 2px 6px rgba(28, 43, 30, 0.03);
+}
+
+.prediction-warning {
+  background: rgba(196, 112, 90, 0.06);
+  border-color: rgba(196, 112, 90, 0.2);
+}
+
+.prediction-positive {
+  background: rgba(107, 143, 113, 0.06);
+  border-color: rgba(107, 143, 113, 0.2);
+}
+
+.prediction-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.prediction-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+
+.prediction-text {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin: 0;
+  font-weight: 500;
+}
+
+.prediction-tip {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0;
+  padding-left: 30px;
+  line-height: 1.4;
 }
 
 /* ─── Mobile ─────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .patterns-wrapper { padding: 32px 16px; }
   .patterns-title { font-size: 2rem; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }

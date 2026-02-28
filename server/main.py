@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import calendar
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
@@ -35,17 +36,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Supabase       — FAILED: {e}")
 
-    # Gemini ping
-    try:
-        response = gemini.models.generate_content(
-            model=GEMINI_MODEL,
-            contents="Reply with the single word: ok",
-            config=types.GenerateContentConfig(temperature=0.0),
-        )
-        _ = response.text
-        print("✅ Gemini API     — connected")
-    except Exception as e:
-        print(f"❌ Gemini API     — FAILED: {e}")
+    # Skip Gemini ping to save API quota
+    print("✅ Gemini API     — configured (skipping ping to save quota)")
 
     print("═" * 50)
     print("  All checks done. Server is ready 🌿")
@@ -132,16 +124,25 @@ Entries: {entries}
 
 
 # ── Gemini helper ─────────────────────────────────────────────────────────────
-def call_gemini(prompt: str) -> dict | list:
-    response = gemini.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.0,
-        ),
-    )
-    return json.loads(response.text.strip())
+def call_gemini(prompt: str, retries: int = 2) -> dict | list:
+    for attempt in range(retries):
+        try:
+            response = gemini.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.0,
+                ),
+            )
+            return json.loads(response.text.strip())
+        except Exception as e:
+            if "429" in str(e) and attempt < retries - 1:
+                wait = (attempt + 1) * 10
+                print(f"⚠️  Gemini rate limited, retrying in {wait}s (attempt {attempt + 1}/{retries})...")
+                time.sleep(wait)
+            else:
+                raise
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -155,7 +156,7 @@ def read_root():
 @app.get("/health")
 async def health_check():
     """Live check — hit http://localhost:8000/health anytime to verify all services."""
-    results = {"fastapi": "ok", "supabase": "unknown", "gemini": "unknown"}
+    results = {"fastapi": "ok", "supabase": "unknown", "gemini": "configured"}
 
     try:
         supabase.table("entries").select("id").limit(1).execute()
@@ -163,18 +164,10 @@ async def health_check():
     except Exception as e:
         results["supabase"] = f"error: {str(e)}"
 
-    try:
-        response = gemini.models.generate_content(
-            model=GEMINI_MODEL,
-            contents="Reply with the single word: ok",
-            config=types.GenerateContentConfig(temperature=0.0),
-        )
-        _ = response.text
-        results["gemini"] = "ok"
-    except Exception as e:
-        results["gemini"] = f"error: {str(e)}"
+    # Don't ping Gemini here — it wastes API quota
+    # Gemini connectivity is validated when users actually make requests
 
-    all_ok = all(v == "ok" for v in results.values())
+    all_ok = all(v != "unknown" for v in results.values())
     if not all_ok:
         raise HTTPException(status_code=503, detail=results)
 
@@ -288,9 +281,172 @@ def _extract_tags(extracted_json: dict) -> list[str]:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# PATTERNS — Gemini pattern analysis
+# PATTERNS — Local statistical analysis (no Gemini needed)
 # GET /patterns/{user_id}
 # ═════════════════════════════════════════════════════════════════════════════
+
+def _compute_patterns(entries: list[dict]) -> list[dict]:
+    """Analyze extracted_json fields across entries to find correlations."""
+    total = len(entries)
+    patterns = []
+
+    # Build per-entry flags
+    rows = []
+    for e in entries:
+        d = e.get("extracted_json") or {}
+        rows.append({
+            "low_sleep": d.get("sleep") == "low" or (d.get("sleep_hours") is not None and d.get("sleep_hours", 99) < 6),
+            "high_stress": d.get("stress") == "high",
+            "exercise": bool(d.get("exercise")),
+            "good_mood": d.get("mood") == "good",
+            "bad_mood": d.get("mood") == "bad",
+            "headache": "headache" in [s.lower() for s in (d.get("symptoms") or [])],
+            "fatigue": "fatigue" in [s.lower() for s in (d.get("symptoms") or [])],
+            "high_sleep": d.get("sleep") == "high" or (d.get("sleep_hours") is not None and d.get("sleep_hours", 0) >= 7),
+            "low_stress": d.get("stress") == "low",
+        })
+
+    # Define cause → effect rules to check
+    rules = [
+        ("low_sleep", "headache", "Sleeping < 6h", "Headache"),
+        ("low_sleep", "fatigue", "Sleeping < 6h", "Fatigue"),
+        ("low_sleep", "bad_mood", "Sleeping < 6h", "Bad mood"),
+        ("high_stress", "headache", "High stress", "Headache"),
+        ("high_stress", "bad_mood", "High stress", "Bad mood"),
+        ("high_stress", "low_sleep", "High stress", "Poor sleep"),
+        ("exercise", "good_mood", "Exercise", "Good mood"),
+        ("exercise", "high_sleep", "Exercise", "Better sleep"),
+        ("high_sleep", "good_mood", "Good sleep (7h+)", "Good mood"),
+        ("low_stress", "good_mood", "Low stress", "Good mood"),
+    ]
+
+    for cause_key, effect_key, cause_label, effect_label in rules:
+        cause_rows = [r for r in rows if r[cause_key]]
+        if len(cause_rows) < 2:
+            continue
+        both = sum(1 for r in cause_rows if r[effect_key])
+        pct = round(both / len(cause_rows) * 100)
+        if pct < 40:
+            continue
+
+        # Determine strength
+        is_positive = cause_key in ("exercise", "high_sleep", "low_stress")
+        if is_positive:
+            strength = "positive"
+        elif pct >= 75:
+            strength = "high"
+        else:
+            strength = "med"
+
+        patterns.append({
+            "cause": cause_label,
+            "effect": effect_label,
+            "occurrences": both,
+            "total": len(cause_rows),
+            "percentage": pct,
+            "strength": strength,
+        })
+
+    # Sort by percentage descending, take top 5
+    patterns.sort(key=lambda p: p["percentage"], reverse=True)
+    return patterns[:5]
+
+
+def _compute_stats(entries: list[dict]) -> dict:
+    """Compute summary statistics from entries."""
+    total = len(entries)
+    moods = {"good": 0, "neutral": 0, "bad": 0}
+    sleep_hours_list = []
+    exercise_count = 0
+    stress_counts = {"low": 0, "medium": 0, "high": 0}
+    all_symptoms = {}
+
+    for e in entries:
+        d = e.get("extracted_json") or {}
+        mood = d.get("mood", "neutral")
+        moods[mood] = moods.get(mood, 0) + 1
+
+        sh = d.get("sleep_hours")
+        if sh is not None:
+            sleep_hours_list.append(sh)
+
+        if d.get("exercise"):
+            exercise_count += 1
+
+        stress = d.get("stress", "medium")
+        stress_counts[stress] = stress_counts.get(stress, 0) + 1
+
+        for s in (d.get("symptoms") or []):
+            sl = s.lower()
+            all_symptoms[sl] = all_symptoms.get(sl, 0) + 1
+
+    avg_sleep = round(sum(sleep_hours_list) / len(sleep_hours_list), 1) if sleep_hours_list else None
+    top_symptoms = sorted(all_symptoms.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "total_entries": total,
+        "mood_distribution": moods,
+        "avg_sleep_hours": avg_sleep,
+        "exercise_rate": round(exercise_count / total * 100) if total > 0 else 0,
+        "stress_distribution": stress_counts,
+        "top_symptoms": [{"name": s, "count": c} for s, c in top_symptoms],
+    }
+
+
+def _generate_predictions(patterns: list[dict], stats: dict) -> list[dict]:
+    """Generate actionable predictions/tips from patterns and stats."""
+    predictions = []
+
+    for p in patterns:
+        if p["strength"] == "high":
+            predictions.append({
+                "type": "warning",
+                "icon": "⚠️",
+                "text": f"When you have {p['cause'].lower()}, there's a {p['percentage']}% chance of {p['effect'].lower()}.",
+                "tip": f"Try to avoid {p['cause'].lower()} to reduce {p['effect'].lower()}.",
+            })
+        elif p["strength"] == "positive":
+            predictions.append({
+                "type": "positive",
+                "icon": "💡",
+                "text": f"{p['cause']} is linked to {p['effect'].lower()} {p['percentage']}% of the time.",
+                "tip": f"Keep it up! {p['cause']} clearly benefits you.",
+            })
+
+    # Add stat-based insights
+    if stats.get("avg_sleep_hours") and stats["avg_sleep_hours"] < 6:
+        predictions.append({
+            "type": "warning",
+            "icon": "🛏️",
+            "text": f"Your average sleep is only {stats['avg_sleep_hours']}h — below the recommended 7-8h.",
+            "tip": "Prioritize a consistent bedtime to improve your overall health.",
+        })
+    elif stats.get("avg_sleep_hours") and stats["avg_sleep_hours"] >= 7:
+        predictions.append({
+            "type": "positive",
+            "icon": "🛏️",
+            "text": f"Great sleep average of {stats['avg_sleep_hours']}h per night.",
+            "tip": "Your sleep habits are solid — keep maintaining them.",
+        })
+
+    if stats.get("exercise_rate", 0) < 30:
+        predictions.append({
+            "type": "warning",
+            "icon": "🏃",
+            "text": f"You only exercised {stats['exercise_rate']}% of days.",
+            "tip": "Even a short walk 3x/week can significantly improve mood and sleep.",
+        })
+    elif stats.get("exercise_rate", 0) >= 50:
+        predictions.append({
+            "type": "positive",
+            "icon": "🏃",
+            "text": f"You exercised {stats['exercise_rate']}% of days — great consistency!",
+            "tip": "Your body thanks you. Exercise is your strongest positive habit.",
+        })
+
+    return predictions[:6]
+
+
 @app.get("/patterns/{user_id}")
 async def get_patterns(user_id: str):
     try:
@@ -307,13 +463,18 @@ async def get_patterns(user_id: str):
         entries = db_response.data
 
         if len(entries) < 7:
-            return {"has_enough_data": False, "patterns": []}
+            return {"has_enough_data": False, "patterns": [], "stats": None, "predictions": []}
 
-        patterns = call_gemini(PATTERNS_PROMPT.format(entries=json.dumps(entries)))
+        patterns = _compute_patterns(entries)
+        stats = _compute_stats(entries)
+        predictions = _generate_predictions(patterns, stats)
 
-        return {"has_enough_data": True, "patterns": patterns}
+        return {
+            "has_enough_data": True,
+            "patterns": patterns,
+            "stats": stats,
+            "predictions": predictions,
+        }
 
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Gemini returned invalid JSON.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
