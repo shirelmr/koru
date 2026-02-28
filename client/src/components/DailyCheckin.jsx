@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import './DailyCheckin.css'
 import InsightModal from '../components/InsightModal'
+import { createDraft } from '../backend/api'
+
+const USER_ID = 'demo-user'
 
 const DailyCheckIn = () => {
   const [entry, setEntry] = useState('')
@@ -8,6 +11,10 @@ const DailyCheckIn = () => {
   const [stress, setStress] = useState(0)
   const [exercise, setExercise] = useState(null)
   const [showInsights, setShowInsights] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [draftEntryId, setDraftEntryId] = useState(null)
+  const [extractedData, setExtractedData] = useState(null)
 
   // Inject Google Fonts
   useEffect(() => {
@@ -27,8 +34,41 @@ const DailyCheckIn = () => {
     })
   }
 
-  const handleSubmit = () => {
-    setShowInsights(true)
+  const handleSubmit = async () => {
+    if (!entry.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const fullText = buildFullText()
+      const result = await createDraft({ userId: USER_ID, text: fullText, date: today })
+      setDraftEntryId(result.entry_id)
+      setExtractedData(result.extracted_data)
+      setShowInsights(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const buildFullText = () => {
+    let parts = [entry.trim()]
+    if (sleep > 0) parts.push(`Sleep quality: ${sleep}/5`)
+    if (stress > 0) parts.push(`Stress level: ${stress}/5`)
+    if (exercise === true) parts.push('Did exercise today')
+    if (exercise === false) parts.push('No exercise today')
+    return parts.join('. ')
+  }
+
+  const handleInsightClose = () => {
+    setShowInsights(false)
+    setDraftEntryId(null)
+    setExtractedData(null)
+    setEntry('')
+    setSleep(0)
+    setStress(0)
+    setExercise(null)
   }
 
   const renderDots = (current, max, onChange) => (
@@ -118,12 +158,15 @@ const DailyCheckIn = () => {
           </div>
         </div>
 
+        {error && <p className="error-text" style={{color:'#C4705A',textAlign:'center',margin:'0.5rem 0',fontSize:'0.85rem'}}>{error}</p>}
+
         <button
           className={`log-button ${entry.length > 0 ? 'ready' : ''}`}
           onClick={handleSubmit}
           type="button"
+          disabled={loading || !entry.trim()}
         >
-          {entry.length > 0 ? 'Log Entry →' : 'Log Entry'}
+          {loading ? 'Analyzing...' : entry.length > 0 ? 'Log Entry →' : 'Log Entry'}
         </button>
 
         <p className="footer-text">Takes 30 seconds · No account needed</p>
@@ -132,7 +175,9 @@ const DailyCheckIn = () => {
 
       <InsightModal
         isOpen={showInsights}
-        onClose={() => setShowInsights(false)}
+        onClose={handleInsightClose}
+        entryId={draftEntryId}
+        extractedData={extractedData}
       />
 
     </div>

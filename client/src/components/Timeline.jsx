@@ -1,44 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './Timeline.css';
+import { getEntries } from '../backend/api';
 
-const mockEntries = [
-  {
-    id: 1,
-    date: '2026-02-28',
-    raw_text: 'Woke up feeling pretty good today. Had a solid breakfast, went for a run in the morning. Feeling energized and ready for the week.',
-    tags: ['exercise', 'good sleep', 'low stress', 'energized'],
-    mood: 'good',
-  },
-  {
-    id: 2,
-    date: '2026-02-27',
-    raw_text: 'Headache most of the day. Slept only 4 hours, had three coffees to compensate. Stressful work calls back to back.',
-    tags: ['headache', 'poor sleep', 'high stress', 'caffeine', 'fatigue'],
-    mood: 'bad',
-  },
-  {
-    id: 3,
-    date: '2026-02-26',
-    raw_text: 'Normal day. Nothing special to report. Cooked at home, watched a show, went to bed on time.',
-    tags: ['neutral mood', 'home cooked', 'good sleep'],
-    mood: 'neutral',
-  },
-  {
-    id: 4,
-    date: '2026-02-25',
-    raw_text: 'Felt a bit anxious in the morning but it passed. Afternoon was productive. Light walk outside helped.',
-    tags: ['anxiety', 'productive', 'light exercise', 'improving'],
-    mood: 'neutral',
-  },
-  {
-    id: 5,
-    date: '2026-02-24',
-    raw_text: 'Really good day. Finished a big project at work, celebrated with friends in the evening. Feeling accomplished.',
-    tags: ['accomplished', 'social', 'low stress', 'happy'],
-    mood: 'good',
-  },
-];
+const USER_ID = 'demo-user';
 
 const MOOD_COLORS = {
   good:    '#6B8F71',
@@ -169,6 +134,18 @@ export default function Timeline() {
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [selectedId, setSelectedId] = useState(null);
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const monthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+
+  useEffect(() => {
+    setLoading(true);
+    getEntries({ userId: USER_ID, month: monthStr })
+      .then((res) => setEntries(res.entries || []))
+      .catch((err) => console.error('Failed to load entries:', err))
+      .finally(() => setLoading(false));
+  }, [monthStr]);
 
   const isCurrentMonth =
     currentMonth.getFullYear() === today.getFullYear() &&
@@ -182,15 +159,9 @@ export default function Timeline() {
       setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   };
 
-  const filteredEntries = mockEntries.filter((e) => {
-    const d = parseDate(e.date);
-    return (
-      d.getFullYear() === currentMonth.getFullYear() &&
-      d.getMonth()    === currentMonth.getMonth()
-    );
-  });
+  const filteredEntries = entries;
 
-  const selectedEntry = mockEntries.find((e) => e.id === selectedId) || null;
+  const selectedEntry = entries.find((e) => e.id === selectedId) || null;
 
   return (
     <div className="page">

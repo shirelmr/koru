@@ -5,7 +5,7 @@ import Patterns from './components/Patterns' // <-- Importa el nuevo componente
 import './App.css'
 
 function App() {
-  const [screen, setScreen] = useState('patterns') // Empieza en patterns para probarlo
+  const [screen, setScreen] = useState('checkin')
 
   return (
     <div className="App">

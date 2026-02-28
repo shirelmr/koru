@@ -1,24 +1,38 @@
 import { useState, useEffect } from "react";
 import "./InsightModal.css";
+import { confirmEntry } from "../backend/api";
 
-export default function InsightModal({ isOpen, onClose }) {
+export default function InsightModal({ isOpen, onClose, entryId, extractedData }) {
   const [saved, setSaved] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editableData, setEditableData] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => setVisible(true), 10);
+      if (extractedData) setEditableData({ ...extractedData });
     } else {
       setVisible(false);
-      setTimeout(() => setSaved(false), 400);
+      setTimeout(() => {
+        setSaved(false);
+        setSaving(false);
+      }, 400);
     }
-  }, [isOpen]);
+  }, [isOpen, extractedData]);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => {
-      onClose();
-    }, 2200);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await confirmEntry({ entryId, extractedData: editableData || extractedData });
+      setSaved(true);
+      setTimeout(() => {
+        onClose();
+      }, 2200);
+    } catch (err) {
+      console.error('Failed to confirm entry:', err);
+      setSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -47,36 +61,58 @@ export default function InsightModal({ isOpen, onClose }) {
                 <span className="insight-label-badge">Analysis complete</span>
               </div>
               <h2 className="insight-title">Here's what I found</h2>
-              <p className="insight-subtitle">
-                "Woke up with a headache, slept 5h, had two coffees..."
-              </p>
             </div>
 
-            {/* TAG GRID */}
-            <div className="insight-grid">
-              <TagGroup label="🤕 Symptoms" tags={["headache", "fatigue"]} color="red" delay={0} />
-              <TagGroup label="😴 Sleep" tags={["low · 5h"]} color="blue" delay={1} />
-              <TagGroup label="☕ Intake" tags={["coffee ×2", "pizza"]} color="amber" delay={2} />
-              <TagGroup label="😤 Stress" tags={["high"]} color="red" delay={3} />
-              <TagGroup label="💪 Exercise" tags={["none"]} color="gray" delay={4} />
-              <TagGroup label="😊 Mood" tags={["neutral"]} color="green" delay={5} />
-            </div>
-
-            {/* SCORE BAR */}
-            <div className="wellness-bar-section">
-              <div className="wellness-bar-header">
-                <span className="wellness-bar-label">Wellness score</span>
-                <span className="wellness-bar-value">4 / 10</span>
+            {/* TAG GRID — populated from API */}
+            {editableData && (
+              <div className="insight-grid">
+                <TagGroup
+                  label="🤕 Symptoms"
+                  tags={editableData.symptoms?.length ? editableData.symptoms : ["none"]}
+                  color="red"
+                  delay={0}
+                />
+                <TagGroup
+                  label="😴 Sleep"
+                  tags={[
+                    editableData.sleep_hours
+                      ? `${editableData.sleep} · ${editableData.sleep_hours}h`
+                      : editableData.sleep || "unknown",
+                  ]}
+                  color="blue"
+                  delay={1}
+                />
+                <TagGroup
+                  label="☕ Intake"
+                  tags={editableData.food?.length ? editableData.food : ["none"]}
+                  color="amber"
+                  delay={2}
+                />
+                <TagGroup
+                  label="😤 Stress"
+                  tags={[editableData.stress || "unknown"]}
+                  color="red"
+                  delay={3}
+                />
+                <TagGroup
+                  label="💪 Exercise"
+                  tags={[editableData.exercise ? "yes" : "none"]}
+                  color="gray"
+                  delay={4}
+                />
+                <TagGroup
+                  label="😊 Mood"
+                  tags={[editableData.mood || "unknown"]}
+                  color="green"
+                  delay={5}
+                />
               </div>
-              <div className="wellness-track">
-                <div className="wellness-fill" style={{ "--fill-pct": "40%" }} />
-              </div>
-            </div>
+            )}
 
             {/* ACTIONS */}
             <div className="insight-actions">
-              <button className="confirm-btn" onClick={handleSave}>
-                <span>Confirm & Save</span>
+              <button className="confirm-btn" onClick={handleSave} disabled={saving}>
+                <span>{saving ? 'Saving...' : 'Confirm & Save'}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
               </button>
               <button className="edit-link" onClick={onClose}>
