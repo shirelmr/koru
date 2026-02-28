@@ -1,5 +1,6 @@
 import os
 import json
+import calendar
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -247,7 +248,9 @@ async def get_entries(user_id: str, month: str | None = None):
         )
 
         if month:
-            query = query.gte("date", f"{month}-01").lte("date", f"{month}-31")
+            year, mon = map(int, month.split("-"))
+            last_day = calendar.monthrange(year, mon)[1]
+            query = query.gte("date", f"{month}-01").lte("date", f"{month}-{last_day:02d}")
 
         db_response = query.execute()
 
@@ -258,6 +261,7 @@ async def get_entries(user_id: str, month: str | None = None):
                 "raw_text": row["raw_text"],
                 "tags": _extract_tags(row["extracted_json"]),
                 "mood": row["extracted_json"].get("mood", "neutral"),
+                "extracted_json": row["extracted_json"],
             }
             for row in db_response.data
         ]

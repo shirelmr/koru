@@ -84,6 +84,17 @@ function DayCard({ entry, index, isSelected, onClick }) {
   );
 }
 
+function DetailRow({ emoji, label, value }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div className="detail-row">
+      <span className="detail-emoji">{emoji}</span>
+      <span className="detail-label">{label}</span>
+      <span className="detail-value">{value}</span>
+    </div>
+  );
+}
+
 function ExpandedEntry({ entry }) {
   if (!entry) {
     return (
@@ -93,6 +104,8 @@ function ExpandedEntry({ entry }) {
       </div>
     );
   }
+
+  const data = entry.extracted_json || {};
 
   return (
     <div className="expanded-entry" key={entry.id}>
@@ -111,8 +124,46 @@ function ExpandedEntry({ entry }) {
         </span>
       </div>
 
-      {/* Tags section */}
-      <p className="section-label">Tags detected</p>
+      {/* Health details */}
+      <div className="expanded-divider" />
+      <p className="section-label">Health details</p>
+      <div className="detail-grid">
+        <DetailRow emoji="😴" label="Sleep" value={
+          data.sleep_hours
+            ? `${data.sleep} · ${data.sleep_hours}h`
+            : data.sleep
+        } />
+        <DetailRow emoji="😤" label="Stress" value={data.stress} />
+        <DetailRow emoji="💪" label="Exercise" value={data.exercise ? 'Yes' : 'No'} />
+        <DetailRow emoji="😊" label="Mood" value={data.mood} />
+      </div>
+
+      {/* Symptoms */}
+      {data.symptoms?.length > 0 && (
+        <>
+          <p className="section-label">Symptoms</p>
+          <div className="expanded-tags">
+            {data.symptoms.map((s) => (
+              <span key={s} className="tag-chip tag-chip-lg tag-symptom">{s}</span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Food / intake */}
+      {data.food?.length > 0 && (
+        <>
+          <p className="section-label">Food &amp; intake</p>
+          <div className="expanded-tags">
+            {data.food.map((f) => (
+              <span key={f} className="tag-chip tag-chip-lg tag-food">{f}</span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Tags */}
+      <p className="section-label">Tags</p>
       <div className="expanded-tags">
         {entry.tags.map((tag) => (
           <span key={tag} className="tag-chip tag-chip-lg">{tag}</span>
@@ -195,7 +246,9 @@ export default function Timeline() {
 
         {/* Cards list */}
         <div className="cards-list">
-          {filteredEntries.length === 0 ? (
+          {loading ? (
+            <p className="no-entries">Loading entries...</p>
+          ) : filteredEntries.length === 0 ? (
             <p className="no-entries">No entries for this month.</p>
           ) : (
             filteredEntries.map((entry, i) => (

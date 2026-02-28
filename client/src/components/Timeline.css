@@ -360,6 +360,55 @@
   line-height: 1.8;
 }
 
+/* ─── Detail grid ────────────────────────────────────────────────── */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bg, #faf9f7);
+  border: 1px solid var(--border, #e8e4de);
+}
+
+.detail-emoji {
+  font-size: 1rem;
+}
+
+.detail-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #888);
+  min-width: 50px;
+}
+
+.detail-value {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text, #2d2a26);
+  text-transform: capitalize;
+}
+
+.tag-symptom {
+  background: #fde8e8 !important;
+  color: #b44040 !important;
+}
+
+.tag-food {
+  background: #fef3e2 !important;
+  color: #b8860b !important;
+}
+
 /* ─── Animation ──────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
