@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import Webcam from 'react-webcam';
 import "./DailyCheckin.css";
+import InsightModal from '../components/InsightModal'
+import { createDraft } from '../backend/api'
 
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
+const USER_ID = 'demo-user'
+
 const DailyCheckIn = () => {
+  // --- STATES DE CHECKIN ---
   const [entry, setEntry] = useState("");
   const [sleep, setSleep] = useState(0);
   const [stress, setStress] = useState(0);
@@ -12,25 +18,35 @@ const DailyCheckIn = () => {
   const [focus, setFocus] = useState(0);
   const [exercise, setExercise] = useState(null);
 
-  // CV toggles / status
-  const [autoDetect, setAutoDetect] = useState(false);
-  const [camStatus, setCamStatus] = useState("off"); // off | loading | on | error
+  const [showInsights, setShowInsights] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [draftEntryId, setDraftEntryId] = useState(null);
+  const [extractedData, setExtractedData] = useState(null);
+
+  // --- STATES DE CAMARA DE 15 SEGUNDOS ---
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [analysisStatus, setAnalysisStatus] = useState("");
 
   // refs: camera + model
-  const videoRef = useRef(null);
+  const webcamRef = useRef(null);
   const rafRef = useRef(null);
-  const streamRef = useRef(null);
   const landmarkerRef = useRef(null);
-
-  // smoothing refs (EMA)
-  const earSmoothRef = useRef(null);
-  const browSmoothRef = useRef(null);
-  const jawSmoothRef = useRef(null);
-  const moodSmoothRef = useRef(null);
-  const moveSmoothRef = useRef(null);
 
   // previous nose position for movement
   const prevNoseRef = useRef(null);
+
+  // Arreglos para guardar el historial de 15 segundos y sacar promedios
+  const historyRef = useRef({
+      ear: [],
+      brow: [],
+      jaw: [],
+      mood: [],
+      move: []
+  });
 
   const formatDate = () => {
     const today = new Date();
@@ -41,18 +57,31 @@ const DailyCheckIn = () => {
     });
   };
 
-  const handleSubmit = () => {
-    console.log({
-      entry,
-      sleep,
-      stress,
-      tension,
-      mood,
-      focus,
-      exercise,
-      date: new Date().toISOString(),
-    });
-    // later: call your FastAPI here, then open InsightModal with extracted data
+  const handleSubmit = async () => {
+    if (!entry.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      let parts = [entry.trim()]
+      if (sleep > 0) parts.push(`Sleep quality: ${sleep}/5`)
+      if (stress > 0) parts.push(`Stress level: ${stress}/5`)
+      if (tension > 0) parts.push(`Tension level: ${tension}/5`)
+      if (mood > 0) parts.push(`Mood level: ${mood}/5`)
+      if (focus > 0) parts.push(`Focus level: ${focus}/5`)
+      if (exercise === true) parts.push('Did exercise today')
+      if (exercise === false) parts.push('No exercise today')
+      const fullText = parts.join('. ')
+
+      const result = await createDraft({ userId: USER_ID, text: fullText, date: today })
+      setDraftEntryId(result.entry_id)
+      setExtractedData(result.extracted_data)
+      setShowInsights(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   };
 
   const renderDots = (current, max, onChange) => (
@@ -72,34 +101,17 @@ const DailyCheckIn = () => {
   // ---------- math helpers ----------
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-  const ema = (prev, next, alpha = 0.12) => {
-    if (prev == null) return next;
-    return prev * (1 - alpha) + next * alpha;
-  };
-
   // EAR (Eye Aspect Ratio)
   const computeEAR = (lm) => {
-    // Left eye indices
-    const L1 = lm[33],
-      L2 = lm[160],
-      L3 = lm[158],
-      L4 = lm[133],
-      L5 = lm[153],
-      L6 = lm[144];
-    // Right eye indices
-    const R1 = lm[362],
-      R2 = lm[385],
-      R3 = lm[387],
-      R4 = lm[263],
-      R5 = lm[373],
-      R6 = lm[380];
+    const L1 = lm[33], L2 = lm[160], L3 = lm[158], L4 = lm[133], L5 = lm[153], L6 = lm[144];
+    const R1 = lm[362], R2 = lm[385], R3 = lm[387], R4 = lm[263], R5 = lm[373], R6 = lm[380];
 
     const leftEAR = (dist(L2, L6) + dist(L3, L5)) / (2 * dist(L1, L4));
     const rightEAR = (dist(R2, R6) + dist(R3, R5)) / (2 * dist(R1, R4));
     return (leftEAR + rightEAR) / 2;
   };
 
-  // Brow metric: inner brow distance normalized by face width
+  // Brow metric
   const computeBrowMetric = (lm) => {
     const browL = lm[70];
     const browR = lm[300];
@@ -108,7 +120,7 @@ const DailyCheckIn = () => {
     return dist(browL, browR) / dist(faceL, faceR);
   };
 
-  // Jaw tension metric: jaw corner distance normalized by face width
+  // Jaw tension metric
   const computeJawMetric = (lm) => {
     const jawL = lm[61];
     const jawR = lm[291];
@@ -117,8 +129,7 @@ const DailyCheckIn = () => {
     return dist(jawL, jawR) / dist(faceL, faceR);
   };
 
-  // Mood metric: compare mouth corners vs mouth center (simple proxy)
-  // More negative => corners higher (smile-ish). More positive => corners lower (sad-ish).
+  // Mood metric
   const computeMoodMetric = (lm) => {
     const mouthL = lm[61];
     const mouthR = lm[291];
@@ -131,7 +142,7 @@ const DailyCheckIn = () => {
     return cornersAvgY - mouthCenterY;
   };
 
-  // Focus metric: head movement using nose tip displacement between frames (smaller movement => more focus)
+  // Focus metric
   const computeMovement = (lm) => {
     const nose = lm[1];
     const prev = prevNoseRef.current;
@@ -143,7 +154,6 @@ const DailyCheckIn = () => {
 
   // ---------- mapping to 1..5 dots ----------
   const earToSleep = (earVal) => {
-    // lower EAR -> more squint/closed -> tired -> lower sleep quality
     if (earVal < 0.20) return 1;
     if (earVal < 0.22) return 2;
     if (earVal < 0.24) return 3;
@@ -152,7 +162,6 @@ const DailyCheckIn = () => {
   };
 
   const browToStress = (browMetric) => {
-    // smaller ratio -> brows closer -> more stress/concentration
     if (browMetric < 0.20) return 5;
     if (browMetric < 0.215) return 4;
     if (browMetric < 0.23) return 3;
@@ -161,7 +170,6 @@ const DailyCheckIn = () => {
   };
 
   const jawToTension = (jawMetric) => {
-    // smaller jaw width ratio can indicate clenching/tension
     if (jawMetric < 0.28) return 5;
     if (jawMetric < 0.30) return 4;
     if (jawMetric < 0.32) return 3;
@@ -170,9 +178,6 @@ const DailyCheckIn = () => {
   };
 
   const moodToDots = (moodMetric) => {
-    // This is subtle; treat it like a "vibe" meter:
-    // smaller/negative -> corners up (better mood) => higher dots
-    // larger/positive -> corners down => lower dots
     if (moodMetric < -0.012) return 5;
     if (moodMetric < -0.004) return 4;
     if (moodMetric < 0.004) return 3;
@@ -181,7 +186,6 @@ const DailyCheckIn = () => {
   };
 
   const movementToFocus = (move) => {
-    // smaller movement => higher focus
     if (move < 0.0018) return 5;
     if (move < 0.0032) return 4;
     if (move < 0.0048) return 3;
@@ -189,56 +193,14 @@ const DailyCheckIn = () => {
     return 1;
   };
 
-  // ---------- MediaPipe init + loop ----------
+
+  // ---------- Inicializar MediaPipe ----------
   useEffect(() => {
-    if (!autoDetect) {
-      setCamStatus("off");
-
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-
-      landmarkerRef.current = null;
-
-      earSmoothRef.current = null;
-      browSmoothRef.current = null;
-      jawSmoothRef.current = null;
-      moodSmoothRef.current = null;
-      moveSmoothRef.current = null;
-      prevNoseRef.current = null;
-
-      return;
-    }
-
-    let cancelled = false;
-
-    const start = async () => {
+    const initModel = async () => {
       try {
-        setCamStatus("loading");
-
-        // 1) camera
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false,
-        });
-        if (cancelled) return;
-
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        // 2) model
         const fileset = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
         );
-
         const landmarker = await FaceLandmarker.createFromOptions(fileset, {
           baseOptions: {
             modelAssetPath:
@@ -247,101 +209,193 @@ const DailyCheckIn = () => {
           runningMode: "VIDEO",
           numFaces: 1,
         });
-
-        if (cancelled) return;
-
         landmarkerRef.current = landmarker;
-        setCamStatus("on");
-
-        // 3) loop
-        const loop = () => {
-          if (!videoRef.current || !landmarkerRef.current) {
-            rafRef.current = requestAnimationFrame(loop);
-            return;
-          }
-
-          const now = performance.now();
-          const result = landmarkerRef.current.detectForVideo(videoRef.current, now);
-          const face = result?.faceLandmarks?.[0];
-
-          if (face && face.length) {
-            const ear = computeEAR(face);
-            const brow = computeBrowMetric(face);
-            const jaw = computeJawMetric(face);
-            const moodM = computeMoodMetric(face);
-            const move = computeMovement(face);
-
-            // smooth everything
-            earSmoothRef.current = ema(earSmoothRef.current, ear, 0.10);
-            browSmoothRef.current = ema(browSmoothRef.current, brow, 0.10);
-            jawSmoothRef.current = ema(jawSmoothRef.current, jaw, 0.10);
-            moodSmoothRef.current = ema(moodSmoothRef.current, moodM, 0.10);
-            moveSmoothRef.current = ema(moveSmoothRef.current, move, 0.18); // a bit faster
-
-            const sleepDots = earToSleep(earSmoothRef.current);
-            const stressDots = browToStress(browSmoothRef.current);
-            const tensionDots = jawToTension(jawSmoothRef.current);
-            const moodDots = moodToDots(moodSmoothRef.current);
-            const focusDots = movementToFocus(moveSmoothRef.current);
-
-            setSleep((p) => (p === sleepDots ? p : sleepDots));
-            setStress((p) => (p === stressDots ? p : stressDots));
-            setTension((p) => (p === tensionDots ? p : tensionDots));
-            setMood((p) => (p === moodDots ? p : moodDots));
-            setFocus((p) => (p === focusDots ? p : focusDots));
-          }
-
-          rafRef.current = requestAnimationFrame(loop);
-        };
-
-        rafRef.current = requestAnimationFrame(loop);
-      } catch (e) {
-        console.error(e);
-        setCamStatus("error");
-        setAutoDetect(false);
+        setIsModelLoaded(true);
+      } catch (err) {
+        console.error("Error cargando MediaPipe:", err);
       }
     };
+    initModel();
+  }, []);
 
-    start();
+  // ---------- Bucle de Detección ----------
+  const detect = () => {
+    if (webcamRef.current && webcamRef.current.video && webcamRef.current.video.readyState === 4 && landmarkerRef.current) {
+      const video = webcamRef.current.video;
+      const now = performance.now();
+      const result = landmarkerRef.current.detectForVideo(video, now);
+      const face = result?.faceLandmarks?.[0];
 
+      if (face && face.length && isAnalyzing) {
+        const ear = computeEAR(face);
+        const brow = computeBrowMetric(face);
+        const jaw = computeJawMetric(face);
+        const moodM = computeMoodMetric(face);
+        const move = computeMovement(face);
+
+        historyRef.current.ear.push(ear);
+        historyRef.current.brow.push(brow);
+        historyRef.current.jaw.push(jaw);
+        historyRef.current.mood.push(moodM);
+        historyRef.current.move.push(move);
+      }
+    }
+    
+    if (cameraActive) {
+      rafRef.current = requestAnimationFrame(detect);
+    }
+  };
+
+  useEffect(() => {
+    if (cameraActive && isModelLoaded) {
+      rafRef.current = requestAnimationFrame(detect);
+    }
     return () => {
-      cancelled = true;
-
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-
-      landmarkerRef.current = null;
     };
-  }, [autoDetect]);
+  }, [cameraActive, isModelLoaded, isAnalyzing]);
+
+  // ---------- Temporizador de 15 segundos ----------
+  useEffect(() => {
+    let timer;
+    if (isAnalyzing && timeLeft > 0) {
+      timer = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
+    } else if (isAnalyzing && timeLeft === 0) {
+      finishAnalysis();
+    }
+    return () => clearTimeout(timer);
+  }, [isAnalyzing, timeLeft]);
+
+  const startAnalysis = () => {
+    if (!isModelLoaded) return;
+    setCameraActive(true);
+    setIsAnalyzing(true);
+    setTimeLeft(15);
+    setAnalysisStatus('Mira a la cámara y compórtate natural...');
+    
+    // Limpiar el historial
+    historyRef.current = { ear: [], brow: [], jaw: [], mood: [], move: [] };
+    prevNoseRef.current = null;
+  };
+
+  const finishAnalysis = () => {
+    setIsAnalyzing(false);
+    
+    // Calcular promedios
+    const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    
+    const avgEar = avg(historyRef.current.ear);
+    const avgBrow = avg(historyRef.current.brow);
+    const avgJaw = avg(historyRef.current.jaw);
+    const avgMood = avg(historyRef.current.mood);
+    const avgMove = avg(historyRef.current.move);
+
+    if (historyRef.current.ear.length > 0) {
+        setSleep(earToSleep(avgEar));
+        setStress(browToStress(avgBrow));
+        setTension(jawToTension(avgJaw));
+        setMood(moodToDots(avgMood));
+        setFocus(movementToFocus(avgMove));
+    }
+
+    setAnalysisStatus('¡Análisis completado! Revisa y ajusta tus resultados.');
+    
+    setTimeout(() => {
+        setCameraActive(false);
+        setAnalysisStatus('');
+    }, 4000);
+  };
+
+  const handleInsightClose = () => {
+    setShowInsights(false);
+    setDraftEntryId(null);
+    setExtractedData(null);
+    setEntry("");
+    setSleep(0);
+    setStress(0);
+    setTension(0);
+    setMood(0);
+    setFocus(0);
+    setExercise(null);
+  };
 
   return (
     <div className="checkin-wrapper">
+        
+      {/* 📹 WIDGET DE CÁMARA FLOTANTE */}
+      {cameraActive && (
+        <div style={{ 
+          position: 'fixed', 
+          bottom: '20px', 
+          right: '20px', 
+          width: '200px', 
+          borderRadius: '12px', 
+          overflow: 'hidden', 
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)', 
+          zIndex: 999,
+          border: isAnalyzing ? '3px solid #C4705A' : '3px solid #82b09a',
+          backgroundColor: '#000',
+          transition: 'all 0.3s ease'
+        }}>
+          <Webcam
+            ref={webcamRef}
+            audio={false}
+            videoConstraints={{ facingMode: "user" }}
+            style={{ width: '100%', height: 'auto', display: 'block', transform: 'scaleX(-1)' }}
+          />
+          
+          <div style={{ 
+            position: 'absolute', 
+            bottom: 0, 
+            width: '100%', 
+            background: 'rgba(0, 0, 0, 0.75)', 
+            color: '#fff', 
+            fontFamily: 'Outfit, sans-serif',
+            fontSize: '13px', 
+            fontWeight: '500',
+            padding: '8px',
+            textAlign: 'center',
+            boxSizing: 'border-box'
+          }}>
+            {isAnalyzing ? (
+                <>Analizando... <strong style={{color: '#C4705A', fontSize: '15px'}}>{timeLeft}s</strong></>
+            ) : (
+                <span style={{color: '#82b09a'}}>Completado ✔</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="checkin-container">
         <div className="checkin-header">
           <h1 className="checkin-title">How are you today?</h1>
           <p className="checkin-date">{formatDate()}</p>
-
-          {/* Auto-detect toggle */}
-          <div className="cv-toggle">
-            <button
-              className={`cv-btn ${autoDetect ? "on" : ""}`}
-              type="button"
-              onClick={() => setAutoDetect((v) => !v)}
-            >
-              {autoDetect ? "Auto-detect: On" : "Auto-detect: Off"}
-              <span className={`cv-dot ${camStatus}`} />
-            </button>
-            <div className="cv-hint">Uses your camera locally (nothing is uploaded).</div>
-          </div>
         </div>
 
-        {/* hidden video for CV */}
-        <video ref={videoRef} className="cv-video" playsInline muted />
+        {/* --- BOTÓN DE MAGIA --- */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', marginTop: '1rem' }}>
+          <button 
+            type="button"
+            className="log-button"
+            style={{ 
+                width: 'auto', 
+                padding: '0.5rem 1.5rem', 
+                backgroundColor: isModelLoaded ? '#C4705A' : '#ccc',
+                opacity: isAnalyzing ? 0.7 : 1,
+                cursor: (isModelLoaded && !isAnalyzing) ? 'pointer' : 'not-allowed'
+            }}
+            onClick={startAnalysis}
+            disabled={!isModelLoaded || isAnalyzing}
+          >
+            {isModelLoaded ? '📸 Auto-detect with Face AI' : 'Loading Face AI...'}
+          </button>
+          
+          {analysisStatus && (
+            <p style={{ fontSize: '0.9rem', color: '#888', marginTop: '0.75rem', fontWeight: 500 }}>
+              {analysisStatus}
+            </p>
+          )}
+        </div>
 
         <div className="textarea-wrapper">
           <textarea
@@ -355,54 +409,15 @@ const DailyCheckIn = () => {
         </div>
 
         <div className="quick-inputs">
-          <MetricRow
-            emoji="😴"
-            label="Sleep quality"
-            autoDetect={autoDetect}
-            camStatus={camStatus}
-            dots={renderDots(sleep, 5, setSleep)}
-          />
-
+          <MetricRow emoji="😴" label="Sleep quality" dots={renderDots(sleep, 5, setSleep)} />
           <div className="divider" />
-
-          <MetricRow
-            emoji="😤"
-            label="Stress level"
-            autoDetect={autoDetect}
-            camStatus={camStatus}
-            dots={renderDots(stress, 5, setStress)}
-          />
-
+          <MetricRow emoji="😤" label="Stress level" dots={renderDots(stress, 5, setStress)} />
           <div className="divider" />
-
-          <MetricRow
-            emoji="😬"
-            label="Tension"
-            autoDetect={autoDetect}
-            camStatus={camStatus}
-            dots={renderDots(tension, 5, setTension)}
-          />
-
+          <MetricRow emoji="😬" label="Tension" dots={renderDots(tension, 5, setTension)} />
           <div className="divider" />
-
-          <MetricRow
-            emoji="🙂"
-            label="Mood"
-            autoDetect={autoDetect}
-            camStatus={camStatus}
-            dots={renderDots(mood, 5, setMood)}
-          />
-
+          <MetricRow emoji="🙂" label="Mood" dots={renderDots(mood, 5, setMood)} />
           <div className="divider" />
-
-          <MetricRow
-            emoji="🧠"
-            label="Focus"
-            autoDetect={autoDetect}
-            camStatus={camStatus}
-            dots={renderDots(focus, 5, setFocus)}
-          />
-
+          <MetricRow emoji="🧠" label="Focus" dots={renderDots(focus, 5, setFocus)} />
           <div className="divider" />
 
           <div className="input-row">
@@ -429,27 +444,36 @@ const DailyCheckIn = () => {
           </div>
         </div>
 
+        {error && <p className="error-text" style={{color:'#C4705A',textAlign:'center',margin:'0.5rem 0',fontSize:'0.85rem'}}>{error}</p>}
+
         <button
           className={`log-button ${entry.length > 0 ? "ready" : ""}`}
           onClick={handleSubmit}
           type="button"
+          disabled={loading || !entry.trim()}
         >
-          Log Entry
+          {loading ? 'Analyzing...' : entry.length > 0 ? 'Log Entry →' : 'Log Entry'}
         </button>
 
         <p className="footer-text">Takes 30 seconds · No account needed</p>
       </div>
+
+      <InsightModal
+        isOpen={showInsights}
+        onClose={handleInsightClose}
+        entryId={draftEntryId}
+        extractedData={extractedData}
+      />
     </div>
   );
 };
 
-function MetricRow({ emoji, label, autoDetect, camStatus, dots }) {
+function MetricRow({ emoji, label, dots }) {
   return (
     <div className="input-row">
       <div className="input-label">
         <span className="input-emoji">{emoji}</span>
         <span>{label}</span>
-        {autoDetect && camStatus === "on" && <span className="auto-pill">auto</span>}
       </div>
       {dots}
     </div>
