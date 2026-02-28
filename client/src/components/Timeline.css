@@ -114,8 +114,11 @@
   flex-direction: column;
   gap: 0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1.5px solid var(--border);
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .no-entries {
