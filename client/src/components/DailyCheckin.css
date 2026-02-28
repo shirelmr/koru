@@ -15,16 +15,14 @@
 /* ─── Layout ────────────────────────────────────────────────────── */
 .checkin-wrapper {
   min-height: 100vh;
+  width: 100%;
   background-color: var(--bg);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 16px 80px;
+  padding: 60px 80px;
+  box-sizing: border-box;
 }
 
 .checkin-container {
   width: 100%;
-  max-width: 440px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -32,22 +30,23 @@
 
 /* ─── Header ────────────────────────────────────────────────────── */
 .checkin-header {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  text-align: center;
 }
 
 .checkin-title {
   font-family: 'DM Serif Display', Georgia, serif;
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 400;
   color: var(--text);
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
 
 .checkin-date {
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--text-muted);
   margin: 0;
   font-weight: 400;
@@ -56,24 +55,24 @@
 /* ─── Textarea ──────────────────────────────────────────────────── */
 .textarea-wrapper {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .checkin-textarea {
   width: 100%;
-  min-height: 128px;
-  padding: 16px;
+  min-height: 160px;
+  padding: 20px;
   border: 1.5px solid var(--border);
   border-radius: 12px;
-  background-color: var(--bg-card);
+  background-color: var(--bg-subtle);
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.6;
-  resize: none;
+  resize: vertical;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 1px 3px rgba(28, 43, 30, 0.05);
+  box-shadow: 0 2px 6px rgba(28, 43, 30, 0.04);
 }
 
 .checkin-textarea:focus {
@@ -100,40 +99,46 @@
 
 /* ─── Quick Inputs Card ─────────────────────────────────────────── */
 .quick-inputs {
-  background-color: var(--bg-card);
+  background-color: var(--bg-subtle);
   border: 1.5px solid var(--border);
   border-radius: 12px;
-  padding: 4px 0;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(28, 43, 30, 0.05);
+  padding: 8px 0;
+  margin-bottom: 32px;
+  box-shadow: 0 2px 6px rgba(28, 43, 30, 0.04);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 32px;
 }
 
 .input-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
+  gap: 12px;
 }
 
 .input-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 500;
   color: var(--text);
+  text-align: center;
 }
 
 .input-emoji {
-  font-size: 1rem;
+  font-size: 1.1rem;
   line-height: 1;
 }
 
 .divider {
-  height: 1px;
+  width: 1px;
+  height: 60px;
   background-color: var(--border);
-  margin: 0 16px;
   opacity: 0.6;
 }
 
@@ -218,14 +223,14 @@
   background-color: var(--bg-subtle);
   color: var(--text-muted);
   border: 1.5px solid var(--border);
-  padding: 15px;
-  border-radius: 10px;
+  padding: 18px 24px;
+  border-radius: 12px;
   font-family: 'DM Sans', sans-serif;
   font-weight: 500;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   letter-spacing: 0.01em;
 }
 
@@ -257,18 +262,43 @@
   text-align: center;
   color: var(--text-muted);
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   margin: 0;
   opacity: 0.8;
 }
 
-/* ─── Mobile ────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
+/* ─── Tablet & Mobile ───────────────────────────────────────────── */
+@media (max-width: 768px) {
   .checkin-wrapper {
-    padding: 32px 16px 80px;
+    padding: 32px 16px;
+    align-items: flex-start;
+  }
+
+  .checkin-container {
+    max-width: 100%;
+    padding: 32px 24px;
+    margin-top: 32px;
   }
 
   .checkin-title {
-    font-size: 1.75rem;
+    font-size: 2rem;
+  }
+
+  .quick-inputs {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .input-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .divider {
+    width: 100%;
+    height: 1px;
+    margin: 0;
   }
 }
