@@ -1,15 +1,62 @@
 import os
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 load_dotenv()
 
-app = FastAPI(title="Kōru API")
+# ── Clients ───────────────────────────────────────────────────────────────────
+supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+
+gemini = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_MODEL = "gemini-2.5-flash"
+
+
+# ── Startup Connection Checks ─────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("\n" + "═" * 50)
+    print("  Kōru API — Starting up...")
+    print("═" * 50)
+
+    print("✅ FastAPI        — running")
+
+    # Supabase ping
+    try:
+        supabase.table("entries").select("id").limit(1).execute()
+        print("✅ Supabase       — connected")
+    except Exception as e:
+        print(f"❌ Supabase       — FAILED: {e}")
+
+    # Gemini ping
+    try:
+        response = gemini.models.generate_content(
+            model=GEMINI_MODEL,
+            contents="Reply with the single word: ok",
+            config=types.GenerateContentConfig(temperature=0.0),
+        )
+        _ = response.text
+        print("✅ Gemini API     — connected")
+    except Exception as e:
+        print(f"❌ Gemini API     — FAILED: {e}")
+
+    print("═" * 50)
+    print("  All checks done. Server is ready 🌿")
+    print("═" * 50 + "\n")
+
+    yield
+
+    print("\n🛑 Kōru API shutting down.")
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
+app = FastAPI(title="Kōru API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,11 +66,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Clients ───────────────────────────────────────────────────────────────────
-supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ── Pydantic Models ───────────────────────────────────────────────────────────
 class CheckInRequest(BaseModel):
@@ -32,7 +74,8 @@ class CheckInRequest(BaseModel):
     date: str  # YYYY-MM-DD
 
 class ConfirmRequest(BaseModel):
-    extracted_data: dict  # allows frontend edits before confirming
+    extracted_data: dict
+
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 EXTRACTION_PROMPT = """
@@ -86,11 +129,13 @@ Rules:
 Entries: {entries}
 """
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+
+# ── Gemini helper ─────────────────────────────────────────────────────────────
 def call_gemini(prompt: str) -> dict | list:
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
+    response = gemini.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
         ),
@@ -99,16 +144,48 @@ def call_gemini(prompt: str) -> dict | list:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 1 — Extract (creates a DRAFT, not yet confirmed)
+# HEALTH
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "Kōru API is running 🌿"}
+
+
+@app.get("/health")
+async def health_check():
+    """Live check — hit http://localhost:8000/health anytime to verify all services."""
+    results = {"fastapi": "ok", "supabase": "unknown", "gemini": "unknown"}
+
+    try:
+        supabase.table("entries").select("id").limit(1).execute()
+        results["supabase"] = "ok"
+    except Exception as e:
+        results["supabase"] = f"error: {str(e)}"
+
+    try:
+        response = gemini.models.generate_content(
+            model=GEMINI_MODEL,
+            contents="Reply with the single word: ok",
+            config=types.GenerateContentConfig(temperature=0.0),
+        )
+        _ = response.text
+        results["gemini"] = "ok"
+    except Exception as e:
+        results["gemini"] = f"error: {str(e)}"
+
+    all_ok = all(v == "ok" for v in results.values())
+    if not all_ok:
+        raise HTTPException(status_code=503, detail=results)
+
+    return {"status": "all systems go 🌿", "services": results}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 1 — Extract + save as draft
 # POST /entries/draft
 # ═════════════════════════════════════════════════════════════════════════════
 @app.post("/entries/draft")
 async def create_draft(request: CheckInRequest):
-    """
-    Calls Gemini to extract variables from free text.
-    Saves a draft row (status='draft') in Supabase.
-    Returns entry_id + extracted_data so the frontend can show the modal.
-    """
     try:
         extracted_json = call_gemini(EXTRACTION_PROMPT.format(text=request.text))
 
@@ -134,15 +211,11 @@ async def create_draft(request: CheckInRequest):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 2 — Confirm (user reviewed/edited tags → mark as confirmed)
+# STEP 2 — Confirm entry
 # PATCH /entries/{entry_id}/confirm
 # ═════════════════════════════════════════════════════════════════════════════
 @app.patch("/entries/{entry_id}/confirm")
 async def confirm_entry(entry_id: str, request: ConfirmRequest):
-    """
-    Marks a draft entry as confirmed.
-    Accepts the (possibly user-edited) extracted_data from the frontend.
-    """
     try:
         db_response = supabase.table("entries").update({
             "extracted_json": request.extracted_data,
@@ -159,15 +232,11 @@ async def confirm_entry(entry_id: str, request: ConfirmRequest):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# TIMELINE — Get all confirmed entries for a user
+# TIMELINE — Get confirmed entries
 # GET /entries/{user_id}?month=2026-02
 # ═════════════════════════════════════════════════════════════════════════════
 @app.get("/entries/{user_id}")
 async def get_entries(user_id: str, month: str | None = None):
-    """
-    Returns all confirmed entries for a user.
-    Optionally filter by month (YYYY-MM).
-    """
     try:
         query = (
             supabase.table("entries")
@@ -178,12 +247,10 @@ async def get_entries(user_id: str, month: str | None = None):
         )
 
         if month:
-            # e.g. month="2026-02" → filter between 2026-02-01 and 2026-02-28
             query = query.gte("date", f"{month}-01").lte("date", f"{month}-31")
 
         db_response = query.execute()
 
-        # Shape data for the frontend Timeline component
         entries = [
             {
                 "id": row["id"],
@@ -202,7 +269,6 @@ async def get_entries(user_id: str, month: str | None = None):
 
 
 def _extract_tags(extracted_json: dict) -> list[str]:
-    """Flatten extracted_json into a flat list of readable tags for the UI."""
     tags = []
     tags += extracted_json.get("symptoms", [])
     tags += extracted_json.get("food", [])
@@ -218,16 +284,11 @@ def _extract_tags(extracted_json: dict) -> list[str]:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# PATTERNS — Gemini analyzes all entries and finds correlations
+# PATTERNS — Gemini pattern analysis
 # GET /patterns/{user_id}
 # ═════════════════════════════════════════════════════════════════════════════
 @app.get("/patterns/{user_id}")
 async def get_patterns(user_id: str):
-    """
-    Fetches all confirmed entries for the user,
-    sends them to Gemini for pattern analysis,
-    returns up to 5 cause-effect correlations.
-    """
     try:
         db_response = (
             supabase.table("entries")
@@ -235,13 +296,12 @@ async def get_patterns(user_id: str):
             .eq("user_id", user_id)
             .eq("status", "confirmed")
             .order("date", desc=True)
-            .limit(60)  # last 60 entries is plenty for pattern detection
+            .limit(60)
             .execute()
         )
 
         entries = db_response.data
 
-        # Need at least 7 entries for meaningful patterns
         if len(entries) < 7:
             return {"has_enough_data": False, "patterns": []}
 
@@ -253,9 +313,3 @@ async def get_patterns(user_id: str):
         raise HTTPException(status_code=500, detail="Gemini returned invalid JSON.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# ── Health check ──────────────────────────────────────────────────────────────
-@app.get("/")
-def read_root():
-    return {"status": "Kōru API is running 🌿"}
