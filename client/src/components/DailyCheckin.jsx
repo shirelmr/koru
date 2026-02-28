@@ -1,24 +1,24 @@
-import { useState } from 'react';
-import './DailyCheckIn.css';
+import { useState } from 'react'
+import './DailyCheckin.css'
 
 const DailyCheckIn = () => {
-  const [entry, setEntry] = useState('');
-  const [sleep, setSleep] = useState(0);
-  const [stress, setStress] = useState(0);
-  const [exercise, setExercise] = useState(null); // null = untouched
+  const [entry, setEntry] = useState('')
+  const [sleep, setSleep] = useState(0)
+  const [stress, setStress] = useState(0)
+  const [exercise, setExercise] = useState(null) // null = untouched
 
   const formatDate = () => {
-    const today = new Date();
+    const today = new Date()
     return today.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
-    });
-  };
+    })
+  }
 
   const handleSubmit = () => {
-    console.log({ entry, sleep, stress, exercise, date: new Date().toISOString() });
-  };
+    console.log({ entry, sleep, stress, exercise, date: new Date().toISOString() })
+  }
 
   const renderDots = (current, max, onChange) => (
     <div className="dots-container">
@@ -32,12 +32,11 @@ const DailyCheckIn = () => {
         />
       ))}
     </div>
-  );
+  )
 
   return (
     <div className="checkin-wrapper">
       <div className="checkin-container">
-
         {/* Header */}
         <div className="checkin-header">
           <h1 className="checkin-title">How are you today?</h1>
@@ -58,7 +57,6 @@ const DailyCheckIn = () => {
 
         {/* Quick inputs */}
         <div className="quick-inputs">
-
           <div className="input-row">
             <div className="input-label">
               <span className="input-emoji">😴</span>
@@ -101,7 +99,6 @@ const DailyCheckIn = () => {
               </button>
             </div>
           </div>
-
         </div>
 
         {/* CTA */}
@@ -114,10 +111,9 @@ const DailyCheckIn = () => {
         </button>
 
         <p className="footer-text">Takes 30 seconds · No account needed</p>
-
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default DailyCheckIn;
+export default DailyCheckIn
