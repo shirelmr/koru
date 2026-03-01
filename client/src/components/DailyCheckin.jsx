@@ -3,6 +3,7 @@ import Webcam from 'react-webcam';
 import "./DailyCheckin.css";
 import InsightModal from '../components/InsightModal'
 import { createDraft } from '../backend/api'
+import useConditionConfig from '../hooks/useConditionConfig'
 
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
@@ -17,6 +18,14 @@ const DailyCheckIn = () => {
   const [mood, setMood] = useState(0);
   const [focus, setFocus] = useState(0);
   const [exercise, setExercise] = useState(null);
+
+  // --- CONDITION-SPECIFIC FIELDS ---
+  const { label: conditionLabel, fields: conditionFields } = useConditionConfig();
+  const [conditionData, setConditionData] = useState({});
+
+  const updateConditionField = (key, value) => {
+    setConditionData((prev) => ({ ...prev, [key]: value }));
+  };
 
   const [showInsights, setShowInsights] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -71,6 +80,21 @@ const DailyCheckIn = () => {
       if (focus > 0) parts.push(`Focus level: ${focus}/5`)
       if (exercise === true) parts.push('Did exercise today')
       if (exercise === false) parts.push('No exercise today')
+
+      // Append condition-specific data
+      for (const field of conditionFields) {
+        const val = conditionData[field.key];
+        if (val !== undefined && val !== '' && val !== null) {
+          if (field.type === 'toggle') {
+            parts.push(`${field.label}: ${val ? 'Yes' : 'No'}`);
+          } else if (field.type === 'bp') {
+            parts.push(`${field.label}: ${val}`);
+          } else {
+            parts.push(`${field.label}: ${val}`);
+          }
+        }
+      }
+
       const fullText = parts.join('. ')
 
       const result = await createDraft({ userId: USER_ID, text: fullText, date: today })
@@ -272,6 +296,7 @@ const DailyCheckIn = () => {
     setExtractedData(null);
     setEntry("");
     setSleep(0); setStress(0); setTension(0); setMood(0); setFocus(0); setExercise(null);
+    setConditionData({});
   };
 
   return (
@@ -442,6 +467,28 @@ const DailyCheckIn = () => {
           </div>
         </div>
 
+        {/* --- CONDITION-SPECIFIC FIELDS --- */}
+        {conditionFields.length > 0 && (
+          <div className="condition-section">
+            <div className="condition-header">
+              <span className="condition-badge">{conditionLabel}</span>
+            </div>
+            <div className="quick-inputs">
+              {conditionFields.map((field, idx) => (
+                <div key={field.key}>
+                  {idx > 0 && <div className="divider" />}
+                  <ConditionField
+                    field={field}
+                    value={conditionData[field.key]}
+                    onChange={(val) => updateConditionField(field.key, val)}
+                    renderDots={renderDots}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && <p className="error-text" style={{color:'#C4705A',textAlign:'center',margin:'0.5rem 0',fontSize:'0.85rem'}}>{error}</p>}
 
         <button
@@ -465,6 +512,90 @@ const DailyCheckIn = () => {
     </div>
   );
 };
+
+function ConditionField({ field, value, onChange }) {
+  if (field.type === 'number') {
+    return (
+      <div className="input-row">
+        <div className="input-label">
+          <span className="input-emoji">{field.emoji}</span>
+          <span>{field.label}</span>
+        </div>
+        <input
+          type="number"
+          className="condition-number-input"
+          placeholder={field.placeholder || ''}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    );
+  }
+
+  if (field.type === 'bp') {
+    return (
+      <div className="input-row">
+        <div className="input-label">
+          <span className="input-emoji">{field.emoji}</span>
+          <span>{field.label}</span>
+        </div>
+        <input
+          type="text"
+          className="condition-number-input"
+          placeholder={field.placeholder || '120/80'}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    );
+  }
+
+  if (field.type === 'toggle') {
+    return (
+      <div className="input-row">
+        <div className="input-label">
+          <span className="input-emoji">{field.emoji}</span>
+          <span>{field.label}</span>
+        </div>
+        <div className="toggle-group">
+          <button
+            className={`toggle-option ${value === true ? 'active' : ''}`}
+            onClick={() => onChange(value === true ? null : true)}
+            type="button"
+          >Yes</button>
+          <button
+            className={`toggle-option ${value === false ? 'active-no' : ''}`}
+            onClick={() => onChange(value === false ? null : false)}
+            type="button"
+          >No</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (field.type === 'select') {
+    return (
+      <div className="input-row">
+        <div className="input-label">
+          <span className="input-emoji">{field.emoji}</span>
+          <span>{field.label}</span>
+        </div>
+        <div className="select-group">
+          {field.options.map((opt) => (
+            <button
+              key={opt}
+              className={`select-option ${value === opt ? 'active' : ''}`}
+              onClick={() => onChange(value === opt ? null : opt)}
+              type="button"
+            >{opt}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 function MetricRow({ emoji, label, dots }) {
   return (

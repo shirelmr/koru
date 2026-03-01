@@ -1,0 +1,217 @@
+/* ─── Onboarding ────────────────────────────────────────────────── */
+.onb-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--bg, #f4f8f4);
+  background-image:
+    radial-gradient(ellipse 70% 50% at 50% -5%, rgba(74, 124, 89, 0.1) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 30% at 90% 90%, rgba(125, 184, 142, 0.07) 0%, transparent 60%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.onb-container {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: onb-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes onb-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Text ──────────────────────────────────────────────────────── */
+.onb-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 2rem;
+  font-weight: 400;
+  color: #1e2d22;
+  margin: 2.5rem 0 0.5rem;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.onb-subtitle {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  color: #5a7a62;
+  text-align: center;
+  line-height: 1.55;
+  max-width: 400px;
+  margin: 0 auto 2rem;
+}
+
+/* ─── Condition cards ───────────────────────────────────────────── */
+.onb-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.onb-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 1.25rem 1.5rem;
+  border-radius: 14px;
+  border: 1.5px solid #c8deca;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.onb-card:hover {
+  border-color: #8ab898;
+  box-shadow: 0 2px 12px rgba(74, 124, 89, 0.08);
+}
+
+.onb-card-selected {
+  border-color: #4a7c59;
+  background: #edf5ee;
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.12);
+}
+
+.onb-card-emoji {
+  font-size: 1.5rem;
+  margin-bottom: 2px;
+}
+
+.onb-card-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1e2d22;
+}
+
+.onb-card-desc {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  color: #5a7a62;
+  line-height: 1.4;
+}
+
+.onb-card-check {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #4a7c59;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* ─── Continue button ───────────────────────────────────────────── */
+.onb-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 12px;
+  border: none;
+  background: #c8deca;
+  color: #5a7a62;
+  cursor: not-allowed;
+  transition: all 0.2s ease;
+  width: 100%;
+  max-width: 320px;
+}
+
+.onb-btn-ready {
+  background: #4a7c59;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(74, 124, 89, 0.25);
+}
+.onb-btn-ready:hover {
+  background: #3d6a4b;
+  transform: translateY(-1px);
+}
+
+/* ─── Preview (step 2) ──────────────────────────────────────────── */
+.onb-preview {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid #c8deca;
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.onb-preview-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e2d22;
+  margin: 0 0 0.75rem;
+}
+
+.onb-preview-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onb-preview-list li {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  color: #2C362A;
+  padding: 8px 12px;
+  background: #f0f5f0;
+  border-radius: 8px;
+}
+.onb-preview-list li::before {
+  content: '✦ ';
+  color: #4a7c59;
+  font-weight: 600;
+}
+
+.onb-preview-note {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  color: #5a7a62;
+  margin: 0.75rem 0 0;
+  font-style: italic;
+}
+
+/* ─── Actions (step 2) ──────────────────────────────────────────── */
+.onb-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.onb-btn-back {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #5a7a62;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+}
+.onb-btn-back:hover {
+  color: #3d6a4b;
+  text-decoration: underline;
+}

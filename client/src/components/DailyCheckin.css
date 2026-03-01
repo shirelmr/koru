@@ -360,3 +360,113 @@
     background: linear-gradient(to right, transparent, var(--border), transparent);
   }
 }
+
+/* ─── Condition-specific section ────────────────────────────────── */
+.condition-section {
+  margin-top: 2rem;
+}
+
+.condition-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.condition-badge {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4a7c59;
+  background: rgba(74, 124, 89, 0.1);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* Override the grid layout inside condition section */
+.condition-section .quick-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 20px 24px;
+}
+
+.condition-section .input-row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+}
+
+.condition-section .input-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font-size: 0.8rem;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.condition-section .input-emoji {
+  font-size: 1.2rem;
+}
+
+.condition-section .divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border, #c8deca), transparent);
+}
+
+.condition-number-input {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border, #c8deca);
+  border-radius: 10px;
+  background: var(--bg-input, #f0f5f0);
+  color: var(--text, #1e2d22);
+  width: 130px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.condition-number-input:focus {
+  border-color: var(--accent, #4a7c59);
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.1);
+}
+.condition-number-input::placeholder {
+  color: var(--text-dim, #9ab8a0);
+  font-size: 0.85rem;
+}
+
+.select-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.select-option {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 9px;
+  border: 1.5px solid var(--border, #c8deca);
+  background: transparent;
+  color: var(--text-muted, #5a7a62);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.select-option:hover {
+  border-color: var(--accent, #4a7c59);
+}
+.select-option.active {
+  background: var(--accent, #4a7c59);
+  color: white;
+  border-color: var(--accent, #4a7c59);
+}
