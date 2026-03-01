@@ -41,3 +41,29 @@
   background-color: #6B8F71;
   color: white;
 }
+
+/* ─── Global Brand (top-left on every page) ──────────────────────── */
+.brand {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  z-index: 10;
+}
+
+.brand-name {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.375rem;
+  font-weight: 400;
+  color: var(--accent, #4a7c59);
+  letter-spacing: -0.01em;
+}
+
+.brand-tag {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #7A9080);
+  font-weight: 400;
+}

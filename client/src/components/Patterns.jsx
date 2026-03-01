@@ -76,6 +76,12 @@ export default function Patterns() {
 
   return (
     <div className="patterns-wrapper">
+      {/* Brand */}
+      <div className="brand">
+        <span className="brand-name">Kōru</span>
+        <span className="brand-tag">Patterns</span>
+      </div>
+
       <div className="patterns-container">
         
         {/* Header */}

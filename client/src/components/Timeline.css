@@ -17,27 +17,11 @@
   height: 100vh;
 }
 
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
+/* Brand overrides for Timeline (positioned in-flow, not absolute) */
+.panel-left .brand {
+  position: static;
   margin-bottom: 48px;
   flex-shrink: 0;
-}
-
-.brand-name {
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-size: 1.375rem;
-  font-weight: 400;
-  color: var(--accent);
-  letter-spacing: -0.01em;
-}
-
-.brand-tag {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  font-weight: 400;
 }
 
 .timeline-title {
@@ -418,6 +402,35 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.panel-left .brand {
+  animation: page-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.timeline-title {
+  animation: page-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+
+.timeline-sub {
+  animation: page-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.month-nav {
+  animation: page-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.cards-list {
+  animation: page-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.panel-right {
+  animation: page-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
 /* ─── Mobile ─────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .page {
@@ -439,5 +452,5 @@
     padding: 32px 20px;
   }
 
-  .brand { margin-bottom: 32px; }
+  .panel-left .brand { margin-bottom: 32px; }
 }

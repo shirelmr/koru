@@ -277,22 +277,10 @@ const DailyCheckIn = () => {
   return (
     <div className="checkin-wrapper">
       
-      {/* 🌿 BRAND LOGO - Esquina Superior Izquierda */}
-      <div style={{
-        position: 'absolute',
-        top: '2rem',
-        left: '2rem',
-        display: 'flex',
-        alignItems: 'baseline',
-        gap: '0.4rem',
-        zIndex: 10
-      }}>
-        <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2rem', fontWeight: 600, color: '#2C362A', lineHeight: 1 }}>
-          Kōru
-        </span>
-        <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#82b09a', fontWeight: 600 }}>
-          Check-in
-        </span>
+      {/* Brand */}
+      <div className="brand">
+        <span className="brand-name">Kōru</span>
+        <span className="brand-tag">Check-in</span>
       </div>
 
       {/* 📹 WIDGET DE CÁMARA FLOTANTE */}
@@ -309,7 +297,7 @@ const DailyCheckIn = () => {
           />
           <div style={{ 
             position: 'absolute', bottom: 0, width: '100%', background: 'rgba(0, 0, 0, 0.75)', 
-            color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '13px', 
+            color: '#fff', fontFamily: "'DM Sans', sans-serif", fontSize: '13px', 
             fontWeight: '500', padding: '8px', textAlign: 'center', boxSizing: 'border-box'
           }}>
             {isAnalyzing ? (
@@ -344,7 +332,7 @@ const DailyCheckIn = () => {
           marginBottom: '2rem',
           display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center'
         }}>
-          <h3 style={{fontFamily: 'Outfit, sans-serif', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#2C362A', fontSize: '1.1rem'}}>
+          <h3 style={{fontFamily: "'DM Sans', sans-serif", fontWeight: 600, margin: '0 0 0.5rem 0', color: '#2C362A', fontSize: '1.1rem'}}>
              Step 1: Let AI scan your mood
           </h3>
           <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '1.2rem', lineHeight: '1.4'}}>
@@ -376,7 +364,7 @@ const DailyCheckIn = () => {
 
         {/* --- PASO 2: TEXTO Y VOZ --- */}
         <div style={{ marginBottom: '0.5rem' }}>
-          <h3 style={{fontFamily: 'Outfit, sans-serif', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#2C362A', fontSize: '1.1rem'}}>
+          <h3 style={{fontFamily: "'DM Sans', sans-serif", fontWeight: 600, margin: '0 0 0.5rem 0', color: '#2C362A', fontSize: '1.1rem'}}>
             Step 2: Tell us more
           </h3>
           <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '1rem'}}>
