@@ -35,11 +35,13 @@ export async function healthCheck() {
  * Call this when user clicks "Log Entry".
  * @returns { entry_id, extracted_data }
  */
-export async function createDraft({ userId, text, date }) {
+export async function createDraft({ userId, text, date, condition, conditionData }) {
   return request("POST", "/entries/draft", {
     user_id: userId,
     text,
     date, // "YYYY-MM-DD"
+    condition: condition || null,
+    condition_data: conditionData || null,
   });
 }
 

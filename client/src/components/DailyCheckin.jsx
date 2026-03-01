@@ -20,7 +20,7 @@ const DailyCheckIn = () => {
   const [exercise, setExercise] = useState(null);
 
   // --- CONDITION-SPECIFIC FIELDS ---
-  const { label: conditionLabel, fields: conditionFields } = useConditionConfig();
+  const { condition, label: conditionLabel, fields: conditionFields } = useConditionConfig();
   const [conditionData, setConditionData] = useState({});
 
   const updateConditionField = (key, value) => {
@@ -70,7 +70,8 @@ const DailyCheckIn = () => {
     setLoading(true)
     setError(null)
     try {
-      const today = new Date().toISOString().slice(0, 10)
+      const now = new Date()
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       let parts = []
       if (entry.trim()) parts.push(entry.trim())
       if (sleep > 0) parts.push(`Sleep quality: ${sleep}/5`)
@@ -97,7 +98,13 @@ const DailyCheckIn = () => {
 
       const fullText = parts.join('. ')
 
-      const result = await createDraft({ userId: USER_ID, text: fullText, date: today })
+      const result = await createDraft({
+        userId: USER_ID,
+        text: fullText,
+        date: today,
+        condition: condition !== 'general' ? condition : null,
+        conditionData: condition !== 'general' ? conditionData : null,
+      })
       setDraftEntryId(result.entry_id)
       setExtractedData(result.extracted_data)
       setShowInsights(true)

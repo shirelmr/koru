@@ -138,6 +138,33 @@ function ExpandedEntry({ entry }) {
         <DetailRow emoji="😊" label="Mood" value={data.mood} />
       </div>
 
+      {/* Condition-specific details */}
+      {data.condition === 'diabetes' && data.condition_data && (
+        <>
+          <div className="expanded-divider" />
+          <p className="section-label">🩸 Diabetes tracking</p>
+          <div className="detail-grid">
+            <DetailRow emoji="🩸" label="Glucose" value={data.condition_data.glucose ? `${data.condition_data.glucose} mg/dL` : null} />
+            <DetailRow emoji="💉" label="Insulin" value={data.condition_data.insulin === true ? 'Taken' : data.condition_data.insulin === false ? 'Not taken' : null} />
+            <DetailRow emoji="🍞" label="Carb intake" value={data.condition_data.carbs} />
+            <DetailRow emoji="🍽️" label="Last meal" value={data.condition_data.meal_type} />
+          </div>
+        </>
+      )}
+
+      {data.condition === 'hypertension' && data.condition_data && (
+        <>
+          <div className="expanded-divider" />
+          <p className="section-label">❤️‍🩹 Hypertension tracking</p>
+          <div className="detail-grid">
+            <DetailRow emoji="❤️‍🩹" label="Blood pressure" value={data.condition_data.bp} />
+            <DetailRow emoji="💓" label="Heart rate" value={data.condition_data.heart_rate ? `${data.condition_data.heart_rate} bpm` : null} />
+            <DetailRow emoji="🧂" label="Sodium intake" value={data.condition_data.sodium} />
+            <DetailRow emoji="💊" label="Medication" value={data.condition_data.medication === true ? 'Taken' : data.condition_data.medication === false ? 'Not taken' : null} />
+          </div>
+        </>
+      )}
+
       {/* Symptoms */}
       {data.symptoms?.length > 0 && (
         <>

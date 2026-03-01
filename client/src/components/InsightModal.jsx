@@ -106,6 +106,65 @@ export default function InsightModal({ isOpen, onClose, entryId, extractedData }
                   color="green"
                   delay={5}
                 />
+
+                {/* ── Condition-specific fields ── */}
+                {editableData.condition === 'diabetes' && editableData.condition_data && (
+                  <>
+                    <TagGroup
+                      label="🩸 Glucose"
+                      tags={[editableData.condition_data.glucose ? `${editableData.condition_data.glucose} mg/dL` : "not logged"]}
+                      color="red"
+                      delay={6}
+                    />
+                    <TagGroup
+                      label="💉 Insulin"
+                      tags={[editableData.condition_data.insulin === true ? "taken" : editableData.condition_data.insulin === false ? "not taken" : "not logged"]}
+                      color="blue"
+                      delay={7}
+                    />
+                    <TagGroup
+                      label="🍞 Carbs"
+                      tags={[editableData.condition_data.carbs || "not logged"]}
+                      color="amber"
+                      delay={8}
+                    />
+                    <TagGroup
+                      label="🍽️ Last meal"
+                      tags={[editableData.condition_data.meal_type || "not logged"]}
+                      color="green"
+                      delay={9}
+                    />
+                  </>
+                )}
+
+                {editableData.condition === 'hypertension' && editableData.condition_data && (
+                  <>
+                    <TagGroup
+                      label="❤️‍🩹 Blood pressure"
+                      tags={[editableData.condition_data.bp || "not logged"]}
+                      color="red"
+                      delay={6}
+                    />
+                    <TagGroup
+                      label="💓 Heart rate"
+                      tags={[editableData.condition_data.heart_rate ? `${editableData.condition_data.heart_rate} bpm` : "not logged"]}
+                      color="blue"
+                      delay={7}
+                    />
+                    <TagGroup
+                      label="🧂 Sodium"
+                      tags={[editableData.condition_data.sodium || "not logged"]}
+                      color="amber"
+                      delay={8}
+                    />
+                    <TagGroup
+                      label="💊 Medication"
+                      tags={[editableData.condition_data.medication === true ? "taken" : editableData.condition_data.medication === false ? "not taken" : "not logged"]}
+                      color="green"
+                      delay={9}
+                    />
+                  </>
+                )}
               </div>
             )}
 

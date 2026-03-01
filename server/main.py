@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from google import genai
@@ -65,6 +66,8 @@ class CheckInRequest(BaseModel):
     user_id: str
     text: str
     date: str  # YYYY-MM-DD
+    condition: Optional[str] = None        # "diabetes" | "hypertension" | None
+    condition_data: Optional[dict] = None  # e.g. {"glucose": "120", "insulin": true}
 
 class ConfirmRequest(BaseModel):
     extracted_data: dict
@@ -183,12 +186,17 @@ async def create_draft(request: CheckInRequest):
     try:
         extracted_json = call_gemini(EXTRACTION_PROMPT.format(text=request.text))
 
+        # Merge condition-specific structured data into extracted_json
+        if request.condition and request.condition_data:
+            extracted_json["condition"] = request.condition
+            extracted_json["condition_data"] = request.condition_data
+
         db_response = supabase.table("entries").insert({
             "user_id": request.user_id,
             "date": request.date,
             "raw_text": request.text,
             "extracted_json": extracted_json,
-            "status": "draft",
+            "status": "confirmed",
         }).execute()
 
         inserted_row = db_response.data[0]
@@ -277,6 +285,25 @@ def _extract_tags(extracted_json: dict) -> list[str]:
         tags.append(f"{stress} stress")
     if extracted_json.get("exercise"):
         tags.append("exercise")
+
+    # Condition-specific tags
+    cond = extracted_json.get("condition")
+    cdata = extracted_json.get("condition_data") or {}
+    if cond == "diabetes":
+        if cdata.get("glucose"):
+            tags.append(f"glucose {cdata['glucose']}")
+        if cdata.get("insulin") is True:
+            tags.append("insulin taken")
+        if cdata.get("carbs"):
+            tags.append(f"{cdata['carbs']} carbs")
+    elif cond == "hypertension":
+        if cdata.get("bp"):
+            tags.append(f"BP {cdata['bp']}")
+        if cdata.get("heart_rate"):
+            tags.append(f"{cdata['heart_rate']} bpm")
+        if cdata.get("medication") is True:
+            tags.append("medication taken")
+
     return tags
 
 

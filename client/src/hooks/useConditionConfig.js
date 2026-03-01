@@ -33,5 +33,6 @@ export default function useConditionConfig() {
     },
   };
 
-  return configs[condition] || configs.general;
+  const cfg = configs[condition] || configs.general;
+  return { ...cfg, condition };
 }
