@@ -420,6 +420,126 @@ def _compute_stats(entries: list[dict]) -> dict:
     }
 
 
+# ── Condition chart configs ────────────────────────────────────────────────────
+# To add a new condition, just add an entry here — no other code changes needed.
+CONDITION_CHART_CONFIGS = {
+    "diabetes": {
+        "label": "Glucose over time",
+        "emoji": "🩸",
+        "primary": {"key": "glucose", "unit": "mg/dL", "high": 180, "low": 70},
+        "indicators": [
+            {"key": "insulin", "type": "toggle", "emoji": "💉", "label": "Insulin"},
+            {"key": "carbs",   "type": "text",   "emoji": "🍞", "label": "Carbs"},
+        ],
+    },
+    "hypertension": {
+        "label": "Blood pressure over time",
+        "emoji": "❤️\u200D🩹",
+        "primary": {"key": "bp", "unit": "mmHg", "high": 140, "low": 90, "split": "/"},
+        "indicators": [
+            {"key": "medication",  "type": "toggle", "emoji": "💊", "label": "Medication"},
+            {"key": "heart_rate", "type": "text",   "emoji": "💓", "label": "Heart rate"},
+        ],
+    },
+    # Easy to extend:
+    # "asthma": {
+    #     "label": "Peak flow over time",
+    #     "emoji": "🫁",
+    #     "primary": {"key": "peak_flow", "unit": "L/min", "high": 600, "low": 200},
+    #     "indicators": [
+    #         {"key": "inhaler", "type": "toggle", "emoji": "💨", "label": "Inhaler used"},
+    #     ],
+    # },
+}
+
+
+def _compute_condition_chart(entries: list[dict], user_condition: str | None = None) -> dict | None:
+    """Build daily time-series data for any condition using the config above."""
+    points = []
+    for e in entries:
+        d = e.get("extracted_json") or {}
+        cond = d.get("condition")
+        cdata = d.get("condition_data")
+        if not cond or not cdata:
+            continue
+        points.append({"date": e["date"], "condition": cond, "values": cdata})
+
+    if not points:
+        return None
+
+    # Use the condition the user currently has selected; fall back to most frequent
+    if user_condition and user_condition != "general":
+        primary_cond = user_condition
+    else:
+        cond_counts: dict[str, int] = {}
+        for p in points:
+            cond_counts[p["condition"]] = cond_counts.get(p["condition"], 0) + 1
+        primary_cond = max(cond_counts, key=cond_counts.get)
+
+    cfg = CONDITION_CHART_CONFIGS.get(primary_cond)
+    if not cfg:
+        return None
+
+    prim = cfg["primary"]
+    filtered = sorted(
+        [p for p in points if p["condition"] == primary_cond],
+        key=lambda p: p["date"],
+    )
+
+    chart_data = []
+    primary_values = []
+
+    for p in filtered:
+        raw = p["values"].get(prim["key"])
+        if raw is None or raw == "":
+            continue
+
+        try:
+            # Handle split values like "120/80" → primary = 120, secondary = 80
+            if prim.get("split") and prim["split"] in str(raw):
+                parts = str(raw).split(prim["split"])
+                val = float(parts[0])
+                secondary_val = float(parts[1]) if len(parts) > 1 else None
+            else:
+                val = float(raw)
+                secondary_val = None
+        except (ValueError, TypeError):
+            continue
+
+        primary_values.append(val)
+        row = {"date": p["date"], "value": val}
+        if secondary_val is not None:
+            row["secondary"] = secondary_val
+
+        # Attach indicator fields
+        for ind in cfg.get("indicators", []):
+            ind_raw = p["values"].get(ind["key"])
+            if ind["type"] == "toggle":
+                row[ind["key"]] = bool(ind_raw)
+            else:
+                row[ind["key"]] = ind_raw if ind_raw else None
+
+        chart_data.append(row)
+
+    if not chart_data:
+        return None
+
+    avg_val = round(sum(primary_values) / len(primary_values), 1)
+
+    return {
+        "condition": primary_cond,
+        "emoji": cfg["emoji"],
+        "label": cfg["label"],
+        "unit": prim["unit"],
+        "threshold_high": prim["high"],
+        "threshold_low": prim["low"],
+        "has_secondary": prim.get("split") is not None,
+        "avg": avg_val,
+        "indicators": cfg.get("indicators", []),
+        "data": chart_data[-30:],
+    }
+
+
 def _generate_predictions(patterns: list[dict], stats: dict) -> list[dict]:
     """Generate actionable predictions/tips from patterns and stats."""
     predictions = []
@@ -475,7 +595,7 @@ def _generate_predictions(patterns: list[dict], stats: dict) -> list[dict]:
 
 
 @app.get("/patterns/{user_id}")
-async def get_patterns(user_id: str):
+async def get_patterns(user_id: str, condition: str | None = None):
     try:
         db_response = (
             supabase.table("entries")
@@ -495,12 +615,14 @@ async def get_patterns(user_id: str):
         patterns = _compute_patterns(entries)
         stats = _compute_stats(entries)
         predictions = _generate_predictions(patterns, stats)
+        condition_chart = _compute_condition_chart(entries, condition)
 
         return {
             "has_enough_data": True,
             "patterns": patterns,
             "stats": stats,
             "predictions": predictions,
+            "condition_chart": condition_chart,
         }
 
     except Exception as e:

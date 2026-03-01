@@ -73,6 +73,7 @@ export async function getEntries({ userId, month = null }) {
  * Get Gemini-analyzed patterns for the Patterns page.
  * @returns { has_enough_data: bool, patterns: [...] }
  */
-export async function getPatterns({ userId }) {
-  return request("GET", `/patterns/${userId}`);
+export async function getPatterns({ userId, condition }) {
+  const query = condition ? `?condition=${condition}` : '';
+  return request("GET", `/patterns/${userId}${query}`);
 }

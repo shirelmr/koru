@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './Patterns.css';
 import { getPatterns } from '../backend/api';
+import useConditionConfig from '../hooks/useConditionConfig';
 
 const USER_ID = 'demo-user';
 
@@ -47,23 +48,126 @@ function PredictionCard({ prediction }) {
   );
 }
 
+function ConditionChart({ chart }) {
+  if (!chart || !chart.data?.length) return null;
+
+  const values = chart.data.map((d) => d.value);
+  const maxVal = Math.max(...values, 1);
+  const thresholdHigh = chart.threshold_high;
+  const thresholdLow = chart.threshold_low;
+  const chartMax = Math.max(maxVal, thresholdHigh) * 1.1;
+  const indicators = chart.indicators || [];
+
+  const formatDay = (dateStr) => {
+    const [, , d] = dateStr.split('-');
+    return parseInt(d, 10);
+  };
+
+  return (
+    <div className="condition-chart-section">
+      <div className="chart-header">
+        <p className="section-title">
+          {chart.emoji} {chart.label}
+        </p>
+        {chart.avg && (
+          <span className="chart-avg">
+            avg: {chart.avg} {chart.unit}
+          </span>
+        )}
+      </div>
+
+      <div className="chart-container">
+        {/* Threshold lines */}
+        <div
+          className="chart-threshold chart-threshold-high"
+          style={{ bottom: `${(thresholdHigh / chartMax) * 100}%` }}
+        >
+          <span className="threshold-label">{thresholdHigh}</span>
+        </div>
+        <div
+          className="chart-threshold chart-threshold-low"
+          style={{ bottom: `${(thresholdLow / chartMax) * 100}%` }}
+        >
+          <span className="threshold-label">{thresholdLow}</span>
+        </div>
+
+        {/* Bars */}
+        <div className="chart-bars">
+          {chart.data.map((point, i) => {
+            const val = point.value;
+            const pct = (val / chartMax) * 100;
+            const isHigh = val >= thresholdHigh;
+            const isLow = val <= thresholdLow;
+            const barColor = isHigh ? '#C4705A' : isLow ? '#C4A460' : '#6B8F71';
+
+            return (
+              <div key={i} className="chart-bar-col">
+                <div className="chart-bar-wrapper">
+                  <div
+                    className="chart-bar"
+                    style={{
+                      height: `${pct}%`,
+                      backgroundColor: barColor,
+                      animationDelay: `${i * 40}ms`,
+                    }}
+                  >
+                    <span className="bar-tooltip">
+                      {val}{point.secondary != null ? `/${point.secondary}` : ''} {chart.unit}
+                    </span>
+                  </div>
+                </div>
+                <span className="chart-bar-label">{formatDay(point.date)}</span>
+                {/* Indicator dots — rendered dynamically from the API */}
+                <div className="bar-indicators">
+                  {indicators
+                    .filter((ind) => ind.type === 'toggle' && point[ind.key])
+                    .map((ind) => (
+                      <span key={ind.key} className="bar-dot" title={ind.label}>
+                        {ind.emoji}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Legend — also dynamic */}
+      <div className="chart-legend">
+        <span><span className="legend-dot" style={{ background: '#6B8F71' }} /> Normal</span>
+        <span><span className="legend-dot" style={{ background: '#C4705A' }} /> High</span>
+        <span><span className="legend-dot" style={{ background: '#C4A460' }} /> Low</span>
+        {indicators
+          .filter((ind) => ind.type === 'toggle')
+          .map((ind) => (
+            <span key={ind.key}>{ind.emoji} = {ind.label}</span>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Patterns() {
+  const { condition } = useConditionConfig();
   const [hasEnoughData, setHasEnoughData] = useState(false);
   const [patterns, setPatterns] = useState([]);
   const [stats, setStats] = useState(null);
   const [predictions, setPredictions] = useState([]);
+  const [conditionChart, setConditionChart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const loadData = () => {
     setLoading(true);
     setError(null);
-    getPatterns({ userId: USER_ID })
+    getPatterns({ userId: USER_ID, condition })
       .then((res) => {
         setHasEnoughData(res.has_enough_data);
         setPatterns(res.patterns || []);
         setStats(res.stats || null);
         setPredictions(res.predictions || []);
+        setConditionChart(res.condition_chart || null);
       })
       .catch((err) => {
         console.error('Failed to load patterns:', err);
@@ -141,6 +245,9 @@ export default function Patterns() {
             {stats && (
               <MoodBar moods={stats.mood_distribution} total={stats.total_entries} />
             )}
+
+            {/* ── Condition Chart ── */}
+            {conditionChart && <ConditionChart chart={conditionChart} />}
 
             {/* ── Top Symptoms ── */}
             {stats?.top_symptoms?.length > 0 && (
