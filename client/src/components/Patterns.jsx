@@ -247,7 +247,7 @@ export default function Patterns() {
             )}
 
             {/* ── Condition Chart ── */}
-            {conditionChart && <ConditionChart chart={conditionChart} />}
+            {condition !== 'general' && conditionChart && <ConditionChart chart={conditionChart} />}
 
             {/* ── Top Symptoms ── */}
             {stats?.top_symptoms?.length > 0 && (
