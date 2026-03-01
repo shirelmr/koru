@@ -31,6 +31,11 @@ const DailyCheckIn = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [analysisStatus, setAnalysisStatus] = useState("");
 
+  // --- STATES DE RECONOCIMIENTO DE VOZ ---
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef(null);
+  const finalTranscriptRef = useRef(""); // Guarda el texto base al empezar a hablar
+
   // refs: camera + model
   const webcamRef = useRef(null);
   const rafRef = useRef(null);
@@ -111,7 +116,6 @@ const DailyCheckIn = () => {
     return (leftEAR + rightEAR) / 2;
   };
 
-  // Brow metric
   const computeBrowMetric = (lm) => {
     const browL = lm[70];
     const browR = lm[300];
@@ -120,7 +124,6 @@ const DailyCheckIn = () => {
     return dist(browL, browR) / dist(faceL, faceR);
   };
 
-  // Jaw tension metric
   const computeJawMetric = (lm) => {
     const jawL = lm[61];
     const jawR = lm[291];
@@ -129,7 +132,6 @@ const DailyCheckIn = () => {
     return dist(jawL, jawR) / dist(faceL, faceR);
   };
 
-  // Mood metric
   const computeMoodMetric = (lm) => {
     const mouthL = lm[61];
     const mouthR = lm[291];
@@ -142,7 +144,6 @@ const DailyCheckIn = () => {
     return cornersAvgY - mouthCenterY;
   };
 
-  // Focus metric
   const computeMovement = (lm) => {
     const nose = lm[1];
     const prev = prevNoseRef.current;
@@ -193,6 +194,70 @@ const DailyCheckIn = () => {
     return 1;
   };
 
+  // ---------- Inicializar Reconocimiento de Voz ----------
+  useEffect(() => {
+    // Compatibilidad para navegadores basados en Chromium/WebKit
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true; // Permite ver el texto en tiempo real
+      
+      // Opcional: Define el idioma. Puedes poner 'es-MX' si prefieres que entienda español
+      recognition.lang = 'en-US'; 
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscriptChunk = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscriptChunk += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+
+        if (finalTranscriptChunk) {
+            finalTranscriptRef.current += finalTranscriptChunk + ' ';
+        }
+
+        // Actualiza el estado con el texto consolidado + el texto que está procesando en vivo
+        setEntry(finalTranscriptRef.current + interimTranscript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error", event.error);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+    } else {
+      console.warn("La API de SpeechRecognition no está soportada en este navegador.");
+    }
+  }, []);
+
+  // Función para prender/apagar el micrófono
+  const toggleRecording = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+    } else {
+      if (recognitionRef.current) {
+        // Guarda el texto que el usuario ya haya escrito a mano antes de hablar
+        finalTranscriptRef.current = entry.trim() ? entry.trim() + ' ' : '';
+        recognitionRef.current.start();
+        setIsRecording(true);
+      } else {
+        alert("Lo sentimos, tu navegador no soporta el reconocimiento de voz nativo. Usa Chrome o Edge.");
+      }
+    }
+  };
 
   // ---------- Inicializar MediaPipe ----------
   useEffect(() => {
@@ -372,7 +437,7 @@ const DailyCheckIn = () => {
           <p className="checkin-date">{formatDate()}</p>
         </div>
 
-        {/* --- BOTÓN DE MAGIA --- */}
+        {/* --- BOTÓN DE MAGIA FACIAL --- */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem', marginTop: '1rem' }}>
           <button 
             type="button"
@@ -397,18 +462,51 @@ const DailyCheckIn = () => {
           )}
         </div>
 
-        <div className="textarea-wrapper">
+        {/* --- TEXTAREA CON MICRÓFONO INTEGRADO --- */}
+        <div className="textarea-wrapper" style={{ position: 'relative' }}>
           <textarea
             className="checkin-textarea"
             value={entry}
             onChange={(e) => setEntry(e.target.value)}
-            placeholder="Write freely... 'Woke up with a headache, slept 5h, had two coffees'"
+            placeholder="Write freely... or use the mic to talk! 'Woke up with a headache, slept 5h, had two coffees'"
             rows={5}
+            style={{ paddingRight: '50px' }} // Dejamos espacio para el botón del micrófono
           />
-          <span className="char-count">{entry.length > 0 ? `${entry.length} chars` : ""}</span>
+          
+          <button
+            onClick={toggleRecording}
+            type="button"
+            style={{
+              position: 'absolute',
+              bottom: '15px',
+              right: '15px',
+              backgroundColor: isRecording ? '#C4705A' : '#f0f0f0',
+              color: isRecording ? 'white' : 'inherit',
+              border: 'none',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: isRecording ? '0 0 10px rgba(196, 112, 90, 0.5)' : 'none',
+              transition: 'all 0.3s ease',
+              fontSize: '18px'
+            }}
+            title={isRecording ? "Stop recording" : "Start Voice Diary"}
+          >
+            {isRecording ? '⏹️' : '🎤'}
+          </button>
+
+          {/* Movimos el char-count a la izquierda para que no choque con el micrófono */}
+          <span className="char-count" style={{ position: 'absolute', bottom: '-20px', left: '0' }}>
+            {entry.length > 0 ? `${entry.length} chars` : ""}
+            {isRecording && <span style={{ color: '#C4705A', marginLeft: '10px' }}>Escuchando...</span>}
+          </span>
         </div>
 
-        <div className="quick-inputs">
+        <div className="quick-inputs" style={{ marginTop: '2.5rem' }}>
           <MetricRow emoji="😴" label="Sleep quality" dots={renderDots(sleep, 5, setSleep)} />
           <div className="divider" />
           <MetricRow emoji="😤" label="Stress level" dots={renderDots(stress, 5, setStress)} />
